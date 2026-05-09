@@ -1,0 +1,1072 @@
+{
+  "v": 12,
+  "name": "ShiftSync Backend APIs",
+  "folders": [
+    {
+      "v": 12,
+      "name": "Auth",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Register",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/auth/register",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@coastaleats.com\",\n  \"password\": \"password123\",\n  \"role\": \"staff\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Login",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/auth/login",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"email\": \"admin@coastaleats.com\",\n  \"password\": \"admin123\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Refresh Token",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/auth/refresh",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"refreshToken\": \"your_refresh_token_here\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Logout",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/auth/logout",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"refreshToken\": \"your_refresh_token_here\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Users",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get All Users",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/users",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get Profile",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/users/profile",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get User By ID",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/users/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Update User",
+          "method": "PATCH",
+          "endpoint": "http://localhost:4000/api/users/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Updated Name\",\n  \"desiredHours\": 35\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Locations",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get All Locations",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/locations",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Create Location",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/locations",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Coastal Eats - Downtown\",\n  \"timezone\": \"America/New_York\",\n  \"address\": \"123 Main St\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get Location By ID",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/locations/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Update Location",
+          "method": "PUT",
+          "endpoint": "http://localhost:4000/api/locations/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Updated Location Name\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Delete Location",
+          "method": "DELETE",
+          "endpoint": "http://localhost:4000/api/locations/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Skills",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get All Skills",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/skills",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Create Skill",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/skills",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"bartender\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Shifts",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get All Shifts",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/shifts",
+          "params": [
+            {
+              "key": "startDate",
+              "value": "2026-05-01",
+              "active": true
+            },
+            {
+              "key": "endDate",
+              "value": "2026-05-31",
+              "active": true
+            }
+          ],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get My Shifts",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/shifts/user/me",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get Shift By ID",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Create Shift",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/shifts",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"locationId\": \"loc_uuid\",\n  \"skillId\": \"skill_uuid\",\n  \"startUtc\": \"2026-05-15T14:00:00Z\",\n  \"endUtc\": \"2026-05-15T22:00:00Z\",\n  \"headcount\": 2\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Update Shift",
+          "method": "PUT",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"headcount\": 3\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Delete Shift",
+          "method": "DELETE",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Publish Shift",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000/publish",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Publish Batch",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/shifts/publish-batch",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"shiftIds\": [\n    \"uuid1\",\n    \"uuid2\"\n  ]\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Assign Staff",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000/assign",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"userId\": \"user_uuid\",\n  \"ignoreConstraints\": false\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Remove Staff",
+          "method": "DELETE",
+          "endpoint": "http://localhost:4000/api/shifts/123e4567-e89b-12d3-a456-426614174000/assign",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"userId\": \"user_uuid\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Swaps & Drops",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get All Swaps",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/swaps",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get Swap By ID",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/swaps/123e4567-e89b-12d3-a456-426614174000",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Request Swap/Drop",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/swaps",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"shiftId\": \"shift_uuid\",\n  \"targetId\": \"target_user_uuid\",\n  \"reason\": \"Family emergency\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Accept Swap",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/swaps/123e4567-e89b-12d3-a456-426614174000/accept",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Approve Swap",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/swaps/123e4567-e89b-12d3-a456-426614174000/approve",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"managerNote\": \"Approved.\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Reject Swap",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/swaps/123e4567-e89b-12d3-a456-426614174000/reject",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"reason\": \"Insufficient coverage\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Cancel Swap",
+          "method": "POST",
+          "endpoint": "http://localhost:4000/api/swaps/123e4567-e89b-12d3-a456-426614174000/cancel",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Labor & Fairness",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get Labor Status",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/labor/status",
+          "params": [
+            {
+              "key": "locationId",
+              "value": "loc_uuid",
+              "active": true
+            },
+            {
+              "key": "weekStart",
+              "value": "2026-05-04",
+              "active": true
+            }
+          ],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Evaluate Overtime",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/labor/overtime-eval",
+          "params": [
+            {
+              "key": "userId",
+              "value": "user_uuid",
+              "active": true
+            },
+            {
+              "key": "proposedHours",
+              "value": "8",
+              "active": true
+            }
+          ],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Analytics",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get Dashboard Stats",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/analytics/dashboard",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Get Fairness Report",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/analytics/fairness",
+          "params": [
+            {
+              "key": "startDate",
+              "value": "2026-05-01",
+              "active": true
+            },
+            {
+              "key": "endDate",
+              "value": "2026-05-31",
+              "active": true
+            }
+          ],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Notifications",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get Notifications",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/notifications",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Mark Read",
+          "method": "PATCH",
+          "endpoint": "http://localhost:4000/api/notifications/123e4567-e89b-12d3-a456-426614174000/read",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Mark All Read",
+          "method": "PATCH",
+          "endpoint": "http://localhost:4000/api/notifications/read-all",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "Audit",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Get Audit Logs",
+          "method": "GET",
+          "endpoint": "http://localhost:4000/api/audit",
+          "params": [
+            {
+              "key": "entityType",
+              "value": "Shift",
+              "active": true
+            },
+            {
+              "key": "entityId",
+              "value": "uuid",
+              "active": true
+            }
+          ],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    }
+  ],
+  "requests": [],
+  "auth": {
+    "authActive": true,
+    "authType": "bearer",
+    "token": "<YOUR_JWT_ACCESS_TOKEN>"
+  },
+  "headers": [],
+  "variables": [],
+  "description": "API collection for ShiftSync Coastal Eats Scheduling Platform.",
+  "preRequestScript": "",
+  "testScript": ""
+}

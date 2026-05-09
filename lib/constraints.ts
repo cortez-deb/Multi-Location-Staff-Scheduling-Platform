@@ -1,23 +1,30 @@
 // ShiftSync — Constraint Engine
-import type { ConstraintCheckResult, ConstraintViolation, Shift, User } from './types'
-import { db } from './db'
+import type { ConstraintCheckResult, ConstraintViolation, Shift, User, Location, RecurringAvailability, AvailabilityException } from './types'
 import { getShiftUTCTimes, durationHours, doRangesOverlap } from './timezone'
 
-function getLocation(locationId: string) {
+interface DbContext {
+  locations: Location[];
+  shifts: Shift[];
+  users: User[];
+  recurringAvailability: RecurringAvailability[];
+  availabilityExceptions: AvailabilityException[];
+}
+
+function getLocation(locationId: string, db: DbContext) {
   return db.locations.find(l => l.id === locationId)!
 }
 
-function getUserWeeklyHours(userId: string, weekShifts: Shift[]): number {
+function getUserWeeklyHours(userId: string, weekShifts: Shift[], db: DbContext): number {
   return weekShifts
     .filter(s => s.assignedStaff.includes(userId))
     .reduce((sum, s) => {
-      const loc = getLocation(s.locationId)
+      const loc = getLocation(s.locationId, db)
       const { start, end } = getShiftUTCTimes(s.date, s.startTime, s.endTime, loc.timezone)
       return sum + durationHours(start, end)
     }, 0)
 }
 
-function getWeekShifts(date: string): Shift[] {
+function getWeekShifts(date: string, db: DbContext): Shift[] {
   const d = new Date(date + 'T12:00:00Z')
   const day = d.getUTCDay()
   const mondayOffset = day === 0 ? -6 : 1 - day
@@ -33,11 +40,12 @@ function getWeekShifts(date: string): Shift[] {
 export function checkAssignmentConstraints(
   shift: Shift,
   user: User,
+  db: DbContext,
   ignoreShiftId?: string // exclude a shift (e.g. during swap)
 ): ConstraintCheckResult {
   const violations: ConstraintViolation[] = []
   const warnings: ConstraintViolation[] = []
-  const loc = getLocation(shift.locationId)
+  const loc = getLocation(shift.locationId, db)
   const { start: newStart, end: newEnd } = getShiftUTCTimes(
     shift.date, shift.startTime, shift.endTime, loc.timezone
   )
@@ -78,7 +86,7 @@ export function checkAssignmentConstraints(
   )
 
   for (const existing of userShifts) {
-    const eLoc = getLocation(existing.locationId)
+    const eLoc = getLocation(existing.locationId, db)
     const { start: eStart, end: eEnd } = getShiftUTCTimes(
       existing.date, existing.startTime, existing.endTime, eLoc.timezone
     )
@@ -113,7 +121,7 @@ export function checkAssignmentConstraints(
     s.date === shift.date && s.assignedStaff.includes(user.id) && s.id !== shift.id
   )
   const dayHours = dayShifts.reduce((sum, s) => {
-    const l = getLocation(s.locationId)
+    const l = getLocation(s.locationId, db)
     const { start, end } = getShiftUTCTimes(s.date, s.startTime, s.endTime, l.timezone)
     return sum + durationHours(start, end)
   }, 0) + durationHours(newStart, newEnd)
@@ -139,8 +147,8 @@ export function checkAssignmentConstraints(
   }
 
   // 5. Weekly hours
-  const weekShifts = getWeekShifts(shift.date)
-  const currentWeekHours = getUserWeeklyHours(user.id, weekShifts)
+  const weekShifts = getWeekShifts(shift.date, db)
+  const currentWeekHours = getUserWeeklyHours(user.id, weekShifts, db)
   const newShiftHours = durationHours(newStart, newEnd)
   const projectedHours = currentWeekHours + newShiftHours
 

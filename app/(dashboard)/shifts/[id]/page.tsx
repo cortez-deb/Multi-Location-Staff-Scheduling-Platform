@@ -10,14 +10,14 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
 
   const db = await getDb()
   const { id } = await params
-  const shift = findShift(id)
+  const shift = await findShift(id)
   if (!shift) notFound()
 
   const location = db.locations.find(l => l.id === shift.locationId)!
   const allStaff = db.users.filter(u => u.role === 'staff' || u.role === 'manager').map(u => {
     const { passwordHash: _, ...s } = u; return s
   })
-  const auditLogs = getEntityAuditLogs('shift', id)
+  const auditLogs = await getEntityAuditLogs('shift', id)
   const performerMap = Object.fromEntries(db.users.map(u => [u.id, u.name]))
 
   return (

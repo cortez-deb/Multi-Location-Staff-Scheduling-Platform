@@ -11,7 +11,7 @@ function stringToColor(str: string) {
   return '#' + '00000'.substring(0, 6 - c.length) + c;
 }
 
-import type { Location, User, Shift, SwapRequest, AppNotification } from './types';
+import type { Location, User, Shift, SwapRequest, AppNotification, RecurringAvailability, AvailabilityException } from './types';
 
 export async function getDb(): Promise<{
   locations: Location[];
@@ -19,6 +19,8 @@ export async function getDb(): Promise<{
   shifts: Shift[];
   swapRequests: SwapRequest[];
   notifications: AppNotification[];
+  recurringAvailability: RecurringAvailability[];
+  availabilityExceptions: AvailabilityException[];
 }> {
   const [usersRes, locationsRes, shiftsRes, swapsRes, skillsRes] = await Promise.all([
     fetchApi('/api/users'),
@@ -100,7 +102,9 @@ export async function getDb(): Promise<{
     users,
     shifts,
     swapRequests,
-    notifications
+    notifications,
+    recurringAvailability: [],
+    availabilityExceptions: []
   };
 }
 

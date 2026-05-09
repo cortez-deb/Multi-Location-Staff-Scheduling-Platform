@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { getDb, findUser } from '@/lib/db'
+import { fetchApi } from '@/lib/api'
 import { redirect, notFound } from 'next/navigation'
 import { StaffProfileClient } from './StaffProfileClient'
 
@@ -9,7 +10,7 @@ export default async function StaffProfilePage({ params }: { params: Promise<{ i
 
   const db = await getDb()
   const { id } = await params
-  const user = findUser(id)
+  const user = await findUser(id)
   if (!user) notFound()
 
   // Staff can only view own profile
@@ -17,7 +18,12 @@ export default async function StaffProfilePage({ params }: { params: Promise<{ i
 
   const { passwordHash: _, ...safeUser } = user
   const locations = db.locations
-  const availability = { recurring: db.recurringAvailability.filter(a => a.userId === id), exceptions: db.availabilityExceptions.filter(a => a.userId === id) }
+  
+  const availabilityRes = await fetchApi(`/api/users/${id}/availability`)
+  const availability = { 
+    recurring: availabilityRes.availabilities || [], 
+    exceptions: availabilityRes.exceptions || [] 
+  }
   const userShifts = db.shifts.filter(s => s.assignedStaff.includes(id) && s.status === 'published').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
 
   return (

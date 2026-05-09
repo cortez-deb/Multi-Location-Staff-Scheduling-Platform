@@ -23,8 +23,8 @@ export default async function AnalyticsPage() {
 
   const staffUsers = db.users.filter(u => u.role === 'staff' && (
     session.user.role === 'admin' ? true :
-    session.user.role === 'manager' ? u.certifiedLocations.some(l => session.managedLocations.includes(l as any)) :
-    u.id === session.user.id
+      session.user.role === 'manager' ? u.certifiedLocations.some(l => session.managedLocations.includes(l as any)) :
+        u.id === session.user.id
   ))
 
   const summaries = staffUsers.map(u => {

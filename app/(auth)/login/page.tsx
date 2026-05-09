@@ -1,5 +1,5 @@
 'use client'
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import {
   TextInput,
   PasswordInput,
@@ -18,6 +18,12 @@ import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {} as any)
+
+  useEffect(() => {
+    if (state?.success) {
+      window.location.href = '/dashboard'
+    }
+  }, [state])
 
   return (
     <Box
@@ -43,7 +49,7 @@ export default function LoginPage() {
               boxShadow: '0 8px 32px rgba(99,102,241,0.35)',
             }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 32, height: 32}}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: 32, height: 32 }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
             </svg>
           </Box>

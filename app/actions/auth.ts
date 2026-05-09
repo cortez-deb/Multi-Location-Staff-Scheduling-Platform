@@ -1,6 +1,5 @@
 'use server'
-import { setSession } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+import { setSession, clearSession } from '@/lib/auth'
 
 export async function loginAction(_prev: any, formData: FormData) {
   const email = formData.get('email') as string
@@ -11,7 +10,8 @@ export async function loginAction(_prev: any, formData: FormData) {
     const res = await fetch(`${backendUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
+      cache: 'no-store',
     });
 
     if (!res.ok) {
@@ -20,17 +20,24 @@ export async function loginAction(_prev: any, formData: FormData) {
     }
 
     const data = await res.json();
-    
-    // Store tokens and basic user info in cookies
+
     await setSession({
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
-      user: data.user
+      user: data.user,
+      managedLocations: data.managedLocations || [],
+      certifiedLocations: data.certifiedLocations || [],
     });
 
   } catch (error) {
     return { error: 'Failed to connect to authentication server' };
   }
 
-  redirect('/dashboard')
+  // Return success — the client will do window.location.href = '/dashboard'
+  // so the browser issues a full navigation after the cookie is committed.
+  return { success: true }
+}
+
+export async function logoutAction() {
+  await clearSession()
 }

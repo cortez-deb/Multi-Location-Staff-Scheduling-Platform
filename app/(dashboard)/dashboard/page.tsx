@@ -1,16 +1,32 @@
 import { getSession } from '@/lib/auth'
 import { getDb } from '@/lib/db'
-import { isShiftActiveNow, getTodayInTimezone, getShiftUTCTimes, durationHours } from '@/lib/timezone'
-import { redirect } from 'next/navigation'
+import { isShiftActiveNow, getShiftUTCTimes, durationHours } from '@/lib/timezone'
 import { DashboardClient } from './DashboardClient'
 
 export const metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
   const session = await getSession()
-  if (!session) redirect('/login')
+  // Middleware guarantees session here, but TypeScript needs the guard
+  if (!session) return null
 
-  const db = await getDb()
+  let db: Awaited<ReturnType<typeof getDb>>
+  try {
+    db = await getDb()
+  } catch (err) {
+    console.error('DashboardPage: failed to load data', err)
+    // Render shell with empty state rather than crashing
+    return (
+      <DashboardClient
+        session={session}
+        onDutyNow={[]}
+        stats={{ totalStaff: 0, shiftsToday: 0, staffOnDuty: 0, pendingSwaps: 0, draftShifts: 0, overtimeCount: 0 }}
+        overtimeWarnings={[]}
+        locations={[]}
+        today={new Date().toISOString().split('T')[0]}
+      />
+    )
+  }
 
   const today = new Date().toISOString().split('T')[0]
 

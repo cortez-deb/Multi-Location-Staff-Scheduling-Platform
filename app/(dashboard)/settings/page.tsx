@@ -25,5 +25,5 @@ export default async function SettingsPage() {
   }
 
   const { passwordHash: _, ...safeUser } = user
-  return <SettingsClient user={{...safeUser, managerName}} />
+  return <SettingsClient user={{ ...safeUser, managerName }} />
 }

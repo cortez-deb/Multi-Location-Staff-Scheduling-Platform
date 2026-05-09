@@ -41,8 +41,8 @@ export default async function SchedulePage({
   )
   const locations = db.locations.filter(l =>
     session.user.role === 'admin' ? true :
-    session.user.role === 'manager' ? session.managedLocations.includes(l.id) :
-    session.certifiedLocations.includes(l.id)
+      session.user.role === 'manager' ? session.managedLocations.includes(l.id) :
+        session.certifiedLocations.includes(l.id)
   )
 
   return (

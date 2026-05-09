@@ -46,7 +46,7 @@ export function initSocketServer(io: SocketIOServer) {
 
   io.on('connection', (socket: Socket) => {
     // Client sends its session info right after connecting
-    socket.on('join', (session: Pick<Session, 'userId' | 'role' | 'managedLocations' | 'certifiedLocations'>) => {
+    socket.on('join', (session: { userId: string; role: string; managedLocations: string[]; certifiedLocations: string[] }) => {
       // Always join personal room
       socket.join(`user:${session.userId}`)
 

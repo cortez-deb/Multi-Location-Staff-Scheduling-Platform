@@ -1,9 +1,10 @@
-import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { DashboardShell } from './DashboardShell'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
-  if (!session) redirect('/login')
+  // Middleware guarantees session exists for this route group;
+  // the null return is a safety-net that should never be reached.
+  if (!session) return null
   return <DashboardShell session={session}>{children}</DashboardShell>
 }
