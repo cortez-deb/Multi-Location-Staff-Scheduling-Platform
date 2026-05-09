@@ -1,0 +1,154 @@
+
+<div style="padding: 0.5rem 0">
+<h2 class="sr-only">ShiftSync database schema entity relationship diagram</h2>
+<div id="erd"></div>
+<style>
+#erd svg { max-width: 100%; }
+</style>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '12px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#555' : '#000000',
+    textColor: dark ? '#dcdcdc' : '#3d3d3a',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  User {
+    uuid id PK
+    string email
+    string name
+    string passwordHash
+    enum role
+    json notifPrefs
+    timestamp createdAt
+  }
+  Location {
+    uuid id PK
+    string name
+    string timezone
+    json address
+  }
+  ManagerLocation {
+    uuid userId FK
+    uuid locationId FK
+  }
+  StaffCertification {
+    uuid userId FK
+    uuid locationId FK
+    timestamp certifiedAt
+    boolean active
+  }
+  Skill {
+    uuid id PK
+    string name
+  }
+  StaffSkill {
+    uuid userId FK
+    uuid skillId FK
+  }
+  Availability {
+    uuid id PK
+    uuid userId FK
+    enum dayOfWeek
+    time startTime
+    time endTime
+    boolean isException
+    date exceptionDate
+  }
+  Shift {
+    uuid id PK
+    uuid locationId FK
+    uuid skillId FK
+    datetime startUtc
+    datetime endUtc
+    int headcount
+    boolean published
+    timestamp publishedAt
+    timestamp editCutoff
+  }
+  ShiftAssignment {
+    uuid id PK
+    uuid shiftId FK
+    uuid userId FK
+    enum status
+    uuid assignedBy FK
+    timestamp assignedAt
+  }
+  SwapRequest {
+    uuid id PK
+    uuid assignmentId FK
+    uuid requesterId FK
+    uuid targetUserId FK
+    enum type
+    enum status
+    uuid managerId FK
+    timestamp expiresAt
+  }
+  AuditLog {
+    uuid id PK
+    uuid entityId
+    string entityType
+    string action
+    uuid actorId FK
+    json before
+    json after
+    timestamp createdAt
+  }
+  Notification {
+    uuid id PK
+    uuid userId FK
+    string type
+    json payload
+    boolean read
+    timestamp createdAt
+  }
+
+  User ||--o{ ManagerLocation : manages
+  User ||--o{ StaffCertification : certified
+  User ||--o{ StaffSkill : has
+  User ||--o{ Availability : sets
+  User ||--o{ ShiftAssignment : assigned
+  User ||--o{ SwapRequest : requests
+  User ||--o{ Notification : receives
+  Location ||--o{ ManagerLocation : has
+  Location ||--o{ StaffCertification : has
+  Location ||--o{ Shift : hosts
+  Skill ||--o{ StaffSkill : tagged
+  Skill ||--o{ Shift : requires
+  Shift ||--o{ ShiftAssignment : has
+  ShiftAssignment ||--o{ SwapRequest : triggers
+`);
+document.getElementById('erd').innerHTML = svg;
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
+</div>

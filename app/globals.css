@@ -1,0 +1,148 @@
+/* =========================================================
+   ShiftSync Global Styles — Mantine era
+   Only base resets, custom keyframes, and utility classes
+   that Mantine doesn't cover natively live here.
+   ========================================================= */
+
+/* Base resets */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ── Theme Variables ─────────────────────────────────────── */
+:root[data-mantine-color-scheme="light"] {
+  --bg-card: #f8fafc;
+  --bg-cell: #ffffff;
+  --border-subtle: rgba(0,0,0,0.06);
+  --border-light: rgba(0,0,0,0.08);
+  --text-default: #111827;
+  --text-muted: #64748b;
+  --mantine-color-placeholder: #64748b;
+  --bg-progress: rgba(0,0,0,0.1);
+  --bg-draft: rgba(0,0,0,0.05);
+  --bg-hover: #f1f5f9;
+}
+
+:root[data-mantine-color-scheme="dark"] {
+  --bg-card: #1a1a24;
+  --bg-cell: #111118;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.08);
+  --text-default: #f1f5f9;
+  --text-muted: #94a3b8;
+  --mantine-color-placeholder: #94a3b8;
+  --bg-progress: rgba(255,255,255,0.1);
+  --bg-draft: rgba(100,116,139,0.2);
+  --bg-hover: #1a1a24;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+
+/* ── Animations ─────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+
+.fade-in  { animation: fadeIn 0.25s ease both; }
+.pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.spin      { animation: spin 0.8s linear infinite; }
+
+/* ── Skeleton loader ─────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-cell) 50%, var(--bg-hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ── Live indicator dot ──────────────────────────────────── */
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16,185,129,0.4);
+  animation: live-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ── Gradient text utility ───────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1, #a78bfa, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glassmorphism card variant ──────────────────────────── */
+.glass {
+  background: var(--border-subtle);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+}
+.glass-hover {
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+.glass-hover:hover {
+  background: var(--border-light);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+/* ── Schedule grid cell add button ──────────────────────── */
+.schedule-add-btn {
+  width: 100%;
+  padding: 4px;
+  background: transparent;
+  border: 1px dashed var(--border-light);
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.schedule-add-btn:hover {
+  border-color: #6366f1;
+  color: #818cf8;
+}
+
+/* ── Skill badge colour helpers (used on Mantine Badge) ─── */
+.skill-bartender  { --badge-bg: rgba(139,92,246,0.15);  --badge-color: #a78bfa; --badge-border: rgba(139,92,246,0.25); }
+.skill-line_cook  { --badge-bg: rgba(249,115,22,0.15);  --badge-color: #fb923c; --badge-border: rgba(249,115,22,0.25); }
+.skill-server     { --badge-bg: rgba(6,182,212,0.15);   --badge-color: #22d3ee; --badge-border: rgba(6,182,212,0.25); }
+.skill-host       { --badge-bg: rgba(16,185,129,0.15);  --badge-color: #34d399; --badge-border: rgba(16,185,129,0.25); }
+.skill-supervisor { --badge-bg: rgba(245,158,11,0.15);  --badge-color: #fbbf24; --badge-border: rgba(245,158,11,0.25); }
+.skill-expo       { --badge-bg: rgba(244,63,94,0.15);   --badge-color: #fb7185; --badge-border: rgba(244,63,94,0.25); }
+.skill-busser     { --badge-bg: rgba(100,116,139,0.15); --badge-color: #94a3b8; --badge-border: rgba(100,116,139,0.25); }
