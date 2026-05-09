@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { StaffClient } from './StaffClient'
 
@@ -8,13 +8,15 @@ export const metadata = { title: 'Staff' }
 export default async function StaffPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (session.role === 'staff') redirect('/dashboard')
+
+  const db = await getDb()
+  if (session.user.role === 'staff') redirect('/dashboard')
 
   const users = db.users
-    .filter(u => u.role !== 'admin' || session.role === 'admin')
+    .filter(u => u.role !== 'admin' || session.user.role === 'admin')
     .map(({ passwordHash: _, ...u }) => u)
     .filter(u =>
-      session.role === 'admin' ? true :
+      session.user.role === 'admin' ? true :
       u.certifiedLocations.some(l => session.managedLocations.includes(l as any)) ||
       u.managedLocations.some(l => session.managedLocations.includes(l as any))
     )

@@ -84,7 +84,7 @@ export function DashboardShell({ session, children }: { session: Session; childr
   const [opened, { toggle }] = useDisclosure()
   const { toggleColorScheme, colorScheme } = useMantineColorScheme()
 
-  const navItems = session.role === 'staff' ? STAFF_NAV : NAV
+  const navItems = session.user.role === 'staff' ? STAFF_NAV : NAV
 
   // Fetch unread notification count
   useEffect(() => {
@@ -122,7 +122,7 @@ export function DashboardShell({ session, children }: { session: Session; childr
     router.push('/login')
   }
 
-  const initials = session.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const initials = session.user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <AppShell
@@ -234,9 +234,9 @@ export function DashboardShell({ session, children }: { session: Session; childr
               </Avatar>
               <Box style={{ minWidth: 0, flex: 1 }}>
                 <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-default)' }}>
-                  {session.name}
+                  {session.user.name}
                 </Text>
-                <Text size="xs" c="dimmed" tt="capitalize">{session.role}</Text>
+                <Text size="xs" c="dimmed" tt="capitalize">{session.user.role}</Text>
               </Box>
             </Group>
           </Link>

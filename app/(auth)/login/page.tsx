@@ -17,7 +17,7 @@ import {
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
-  const [state, action, pending] = useActionState(loginAction, {})
+  const [state, action, pending] = useActionState(loginAction, {} as any)
 
   return (
     <Box

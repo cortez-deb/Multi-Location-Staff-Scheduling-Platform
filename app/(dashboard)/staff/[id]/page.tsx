@@ -1,17 +1,19 @@
 import { getSession } from '@/lib/auth'
-import { db, findUser } from '@/lib/db'
+import { getDb, findUser } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import { StaffProfileClient } from './StaffProfileClient'
 
 export default async function StaffProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session) redirect('/login')
+
+  const db = await getDb()
   const { id } = await params
   const user = findUser(id)
   if (!user) notFound()
 
   // Staff can only view own profile
-  if (session.role === 'staff' && session.userId !== id) redirect('/dashboard')
+  if (session.user.role === 'staff' && session.user.id !== id) redirect('/dashboard')
 
   const { passwordHash: _, ...safeUser } = user
   const locations = db.locations

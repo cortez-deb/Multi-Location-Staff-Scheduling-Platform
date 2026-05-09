@@ -19,7 +19,7 @@ export function SwapsClient({ session, swaps, locations, allStaff }: {
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
-  const isManager = session.role !== 'staff'
+  const isManager = session.user.role !== 'staff'
 
   const filtered = filter === 'all' ? swaps : swaps.filter(s => s.status === filter)
   const pendingCount = swaps.filter(s => s.status === 'pending' || s.status === 'accepted').length
@@ -57,7 +57,7 @@ export function SwapsClient({ session, swaps, locations, allStaff }: {
             </Button>
           ))}
         </Group>
-        {session.role === 'staff' && (
+        {session.user.role === 'staff' && (
           <Button size="sm" variant="gradient" gradient={{ from: '#6366f1', to: '#4f46e5' }}
             onClick={() => setShowCreate(true)}>
             + Request Swap/Drop
@@ -75,8 +75,8 @@ export function SwapsClient({ session, swaps, locations, allStaff }: {
           {filtered.map(swap => {
             const loc = locations.find(l => l.id === swap.shift?.locationId)
             const canApprove = isManager && (swap.status === 'pending' && swap.type === 'drop' || swap.status === 'accepted')
-            const canAccept = session.userId === swap.targetStaffId && swap.status === 'pending'
-            const canCancel = (session.userId === swap.requesterId && swap.status === 'pending') || isManager
+            const canAccept = session.user.id === swap.targetStaffId && swap.status === 'pending'
+            const canCancel = (session.user.id === swap.requesterId && swap.status === 'pending') || isManager
             const isPending = swap.status === 'pending' || swap.status === 'accepted'
 
             return (
@@ -169,7 +169,7 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
   const [error, setError] = useState('')
 
   useState(() => {
-    fetch(`/api/shifts?staffId=${session.userId}&status=published`).then(r => r.json()).then(d => {
+    fetch(`/api/shifts?staffId=${session.user.id}&status=published`).then(r => r.json()).then(d => {
       if (d.success) setMyShifts(d.data.filter((s: any) => s.date >= new Date().toISOString().split('T')[0]))
     })
   })
@@ -221,7 +221,7 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
             <Select
               label="Swap With"
               placeholder="Select staff…"
-              data={allStaff.filter(u => u.id !== session.userId).map(u => ({ value: u.id, label: u.name }))}
+              data={allStaff.filter(u => u.id !== session.user.id).map(u => ({ value: u.id, label: u.name }))}
               value={form.targetStaffId}
               onChange={v => setForm(f => ({ ...f, targetStaffId: v ?? '' }))}
               required

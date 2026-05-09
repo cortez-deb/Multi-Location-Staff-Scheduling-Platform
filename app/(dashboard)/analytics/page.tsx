@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { AnalyticsClient } from './AnalyticsClient'
 import { getShiftUTCTimes, durationHours } from '@/lib/timezone'
@@ -10,6 +10,8 @@ export default async function AnalyticsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
+  const db = await getDb()
+
   const today = new Date().toISOString().split('T')[0]
   const d = new Date(); const dow = d.getUTCDay()
   const mon = new Date(d); mon.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow))
@@ -17,12 +19,12 @@ export default async function AnalyticsPage() {
   const weekEnd = new Date(mon.getTime() + 6 * 86400000).toISOString().split('T')[0]
 
   let shifts = db.shifts.filter(s => s.status === 'published' && s.date >= weekStart && s.date <= weekEnd)
-  if (session.role === 'manager') shifts = shifts.filter(s => session.managedLocations.includes(s.locationId as any))
+  if (session.user.role === 'manager') shifts = shifts.filter(s => session.managedLocations.includes(s.locationId as any))
 
   const staffUsers = db.users.filter(u => u.role === 'staff' && (
-    session.role === 'admin' ? true :
-    session.role === 'manager' ? u.certifiedLocations.some(l => session.managedLocations.includes(l as any)) :
-    u.id === session.userId
+    session.user.role === 'admin' ? true :
+    session.user.role === 'manager' ? u.certifiedLocations.some(l => session.managedLocations.includes(l as any)) :
+    u.id === session.user.id
   ))
 
   const summaries = staffUsers.map(u => {
@@ -52,7 +54,7 @@ export default async function AnalyticsPage() {
     ? Math.round(summaries.reduce((s, u) => s + u.fairnessScore, 0) / summaries.length) : 100
 
   const locations = db.locations.filter(l =>
-    session.role === 'admin' ? true : session.managedLocations.includes(l.id)
+    session.user.role === 'admin' ? true : session.managedLocations.includes(l.id)
   )
 
   return (

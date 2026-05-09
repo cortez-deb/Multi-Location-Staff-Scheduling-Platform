@@ -21,7 +21,7 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
   const [overrideReason, setOverrideReason] = useState('')
   const [pendingAssign, setPendingAssign] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
-  const isManager = session.role !== 'staff'
+  const isManager = session.user.role !== 'staff'
 
   const eligible = allStaff.filter(u =>
     u.skills.includes(shift.requiredSkill) &&

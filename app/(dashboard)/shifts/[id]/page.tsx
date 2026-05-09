@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth'
-import { db, findShift } from '@/lib/db'
+import { getDb, findShift } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import { getEntityAuditLogs } from '@/lib/audit'
 import { ShiftDetailClient } from './ShiftDetailClient'
@@ -7,6 +7,8 @@ import { ShiftDetailClient } from './ShiftDetailClient'
 export default async function ShiftDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session) redirect('/login')
+
+  const db = await getDb()
   const { id } = await params
   const shift = findShift(id)
   if (!shift) notFound()

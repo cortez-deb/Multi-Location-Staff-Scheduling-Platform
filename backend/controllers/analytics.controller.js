@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import { Shift, ShiftAssignment, Location, User } from '../models/index.js';
-import { calculateCV } from '../utils/fairness.js';
+import { coefficientOfVariation } from '../utils/fairness.js';
 import { DateTime } from 'luxon';
 
 export async function getDashboardStats(req, res, next) {
@@ -58,10 +58,10 @@ export async function getDashboardStats(req, res, next) {
     }
 
     const hoursAssignedArray = Object.values(staffHours);
-    const cvHours = calculateCV(hoursAssignedArray);
+    const cvHours = coefficientOfVariation(hoursAssignedArray);
 
     const ratios = Object.keys(staffHours).map(uid => staffHours[uid] / staffDesired[uid]);
-    const cvRatio = calculateCV(ratios);
+    const cvRatio = coefficientOfVariation(ratios);
 
     res.json({
       totalShifts,

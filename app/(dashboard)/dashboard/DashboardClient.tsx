@@ -39,7 +39,7 @@ export function DashboardClient({ session, onDutyNow: initial, stats: initialSta
     }
   })
 
-  const isManager = session.role === 'manager' || session.role === 'admin'
+  const isManager = session.user.role === 'manager' || session.user.role === 'admin'
 
   return (
     <Box p={32} pb={48} maw={1280} mx="auto">
@@ -50,7 +50,7 @@ export function DashboardClient({ session, onDutyNow: initial, stats: initialSta
           <Text size="xs" c="green" fw={600}>LIVE</Text>
         </Group>
         <Title order={1} size={28} fw={800}>
-          Good {getTimeOfDay()}, {session.name.split(' ')[0]} 👋
+          Good {getTimeOfDay()}, {session.user.name.split(' ')[0]} 👋
         </Title>
         <Text size="sm" c="dimmed" mt={6}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · Coastal Eats Operations

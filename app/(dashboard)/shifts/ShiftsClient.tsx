@@ -25,7 +25,7 @@ export function ShiftsClient({ session, shifts, staffMap, locations }: {
   const [filterLocation, setFilterLocation] = useState<string | null>(null)
   const [filterSkill, setFilterSkill] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const isManager = session.role !== 'staff'
+  const isManager = session.user.role !== 'staff'
 
   const filtered = shifts.filter(s => {
     if (filterStatus && s.status !== filterStatus) return false

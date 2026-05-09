@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { isShiftActiveNow, getTodayInTimezone, getShiftUTCTimes, durationHours } from '@/lib/timezone'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
@@ -9,6 +9,8 @@ export const metadata = { title: 'Dashboard' }
 export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+
+  const db = await getDb()
 
   const today = new Date().toISOString().split('T')[0]
 

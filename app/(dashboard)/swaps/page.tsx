@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SwapsClient } from './SwapsClient'
 
@@ -9,6 +9,8 @@ export default async function SwapsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
+  const db = await getDb()
+
   let swaps = db.swapRequests.map(s => ({
     ...s,
     shift: db.shifts.find(sh => sh.id === s.shiftId) ?? null,
@@ -16,9 +18,9 @@ export default async function SwapsPage() {
     target: s.targetStaffId ? (() => { const u = db.users.find(u => u.id === s.targetStaffId); if (!u) return null; const { passwordHash: _, ...r } = u; return r })() : null,
   }))
 
-  if (session.role === 'staff') {
-    swaps = swaps.filter(s => s.requesterId === session.userId || s.targetStaffId === session.userId)
-  } else if (session.role === 'manager') {
+  if (session.user.role === 'staff') {
+    swaps = swaps.filter(s => s.requesterId === session.user.id || s.targetStaffId === session.user.id)
+  } else if (session.user.role === 'manager') {
     swaps = swaps.filter(s => s.shift && session.managedLocations.includes(s.shift.locationId as any))
   }
 

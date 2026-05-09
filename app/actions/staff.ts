@@ -1,7 +1,7 @@
 'use server'
 
-import { db, nextId } from '@/lib/db'
-import type { User, Role, Skill, LocationId } from '@/lib/types'
+import { fetchApi } from '@/lib/api'
+import type { Role, Skill, LocationId } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth'
 
@@ -13,30 +13,25 @@ export async function addUser(data: {
   certifiedLocations: LocationId[]
 }) {
   await requireRole('admin')
-  const newUser: User = {
-    id: nextId('user'),
-    name: data.name,
-    email: data.email,
-    passwordHash: 'default123', // Demo purposes
-    role: data.role,
-    avatarInitials: data.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-    avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), // Random hex color
-    skills: data.skills,
-    certifiedLocations: data.certifiedLocations,
-    managedLocations: data.role === 'admin' || data.role === 'manager' ? data.certifiedLocations : [],
-    desiredHoursPerWeek: 35, // Default
-    maxHoursPerWeek: 40, // Default
-    hireDate: new Date().toISOString().split('T')[0],
-    isActive: true,
-    notificationPrefs: {
-      inApp: true,
-      emailSimulation: false,
-    },
-  }
+  
+  try {
+    const newUser = await fetchApi('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: data.name,
+        email: data.email,
+        password: 'password123', // Demo
+        role: data.role,
+        skills: data.skills,
+        locations: data.certifiedLocations,
+      })
+    })
 
-  db.users.push(newUser)
-  revalidatePath('/staff')
-  return { success: true, user: newUser }
+    revalidatePath('/staff')
+    return { success: true, user: newUser }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
 }
 
 export async function updateUser(id: string, data: {
@@ -48,21 +43,19 @@ export async function updateUser(id: string, data: {
   isActive?: boolean
 }) {
   await requireRole('admin')
-  const userIndex = db.users.findIndex(u => u.id === id)
-  if (userIndex === -1) {
-    return { success: false, error: 'User not found' }
-  }
-
-  const existing = db.users[userIndex]
-  const updatedUser = { ...existing, ...data }
   
-  if (data.role && (data.role === 'admin' || data.role === 'manager')) {
-    updatedUser.managedLocations = updatedUser.certifiedLocations
-  } else if (data.role === 'staff') {
-    updatedUser.managedLocations = []
-  }
+  try {
+    const updatedUser = await fetchApi(`/api/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...data,
+        locations: data.certifiedLocations
+      })
+    })
 
-  db.users[userIndex] = updatedUser
-  revalidatePath('/staff')
-  return { success: true, user: updatedUser }
+    revalidatePath('/staff')
+    return { success: true, user: updatedUser }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
 }

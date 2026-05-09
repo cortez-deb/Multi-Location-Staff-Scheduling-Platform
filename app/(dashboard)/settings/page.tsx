@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { db, findUser } from '@/lib/db'
+import { getDb, findUser } from '@/lib/db'
 import { SettingsClient } from './SettingsClient'
 
 export const metadata = { title: 'Settings' }
@@ -8,8 +8,11 @@ export const metadata = { title: 'Settings' }
 export default async function SettingsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  const user = findUser(session.userId)
+
+  const user = await findUser(session.user.id)
   if (!user) redirect('/login')
+
+  const db = await getDb()
 
   let managerName = 'None'
   if (user.role === 'manager') {

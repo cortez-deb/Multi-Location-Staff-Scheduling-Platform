@@ -34,7 +34,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
   const [editShiftData, setEditShiftData] = useState<Partial<Shift> | null>(null)
   const [dragError, setDragError] = useState<string | null>(null)
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
-  const isManager = session.role !== 'staff'
+  const isManager = session.user.role !== 'staff'
 
   function navigate(dir: 'prev' | 'next') {
     const d = new Date(weekStart + 'T12:00:00Z')
@@ -238,7 +238,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         <ShiftFormModal
           opened={true}
           locations={locations.filter(l =>
-            session.role === 'admin' ? true : session.managedLocations.includes(l.id)
+            session.user.role === 'admin' ? true : session.managedLocations.includes(l.id)
           )}
           onClose={() => { setShowCreate(false); setEditShiftData(null) }}
           onSaved={() => { setShowCreate(false); setEditShiftData(null); router.refresh() }}
@@ -306,7 +306,7 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
 }) {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
-  const isManager = session.role !== 'staff'
+  const isManager = session.user.role !== 'staff'
 
   async function publish() {
     if (!shift) return

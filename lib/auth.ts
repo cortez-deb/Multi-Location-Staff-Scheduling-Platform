@@ -7,11 +7,20 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 
 export async function getSession(): Promise<Session | null> {
   const cookieStore = await cookies()
-  const raw = cookieStore.get(COOKIE_NAME)?.value
-  if (!raw) return null
+  const sessionCookie = cookieStore.get('shiftsync_session')
+  if (!sessionCookie) return null
+
   try {
-    return JSON.parse(raw) as Session
-  } catch {
+    const session = JSON.parse(sessionCookie.value) as Session
+    if (!session || !session.user) {
+      return null
+    }
+    return {
+      ...session,
+      managedLocations: session.managedLocations || [],
+      certifiedLocations: session.certifiedLocations || []
+    }
+  } catch (err) {
     return null
   }
 }
@@ -39,9 +48,9 @@ export async function requireSession(): Promise<Session> {
 }
 
 export async function requireRole(
-  ...roles: Session['role'][]
+  ...roles: Session['user']['role'][]
 ): Promise<Session> {
   const session = await requireSession()
-  if (!roles.includes(session.role)) throw new Error('Forbidden')
+  if (!roles.includes(session.user.role)) throw new Error('Forbidden')
   return session
 }

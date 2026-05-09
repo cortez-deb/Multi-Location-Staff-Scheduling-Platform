@@ -91,7 +91,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
             <Title order={1} size={24} fw={800}>Staff</Title>
             <Text size="sm" c="dimmed" mt={4}>{filtered.length} members</Text>
           </Box>
-          {session.role === 'admin' && (
+          {session.user.role === 'admin' && (
             <Button onClick={handleOpenAdd} size="sm" radius="md">Add User</Button>
           )}
         </Group>
@@ -214,7 +214,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
                           </svg>
                         )}
                       </Text>
-                      {session.role === 'admin' && (
+                      {session.user.role === 'admin' && (
                         <Button size="compact-xs" variant="light" onClick={(e) => handleOpenEdit(e, user)}>Edit</Button>
                       )}
                     </Group>

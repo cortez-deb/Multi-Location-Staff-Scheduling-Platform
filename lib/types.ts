@@ -183,12 +183,19 @@ export interface AuditLog {
 // Session
 // ─────────────────────────────────────────────────────────────
 export interface Session {
-  userId: string
-  role: Role
-  name: string
-  email: string
-  managedLocations: LocationId[]
-  certifiedLocations: LocationId[]
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+    desiredHours?: number;
+    notifyInApp?: boolean;
+    notifyEmail?: boolean;
+  };
+  managedLocations: LocationId[];
+  certifiedLocations: LocationId[];
 }
 
 // ─────────────────────────────────────────────────────────────

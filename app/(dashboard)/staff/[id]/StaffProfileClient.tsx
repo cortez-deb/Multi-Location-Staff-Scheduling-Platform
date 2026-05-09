@@ -13,7 +13,7 @@ export function StaffProfileClient({ session, user, locations, availability, rec
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-  const canEdit = session.userId === user.id || session.role !== 'staff'
+  const canEdit = session.user.id === user.id || session.user.role !== 'staff'
 
   async function saveAvail(dayOfWeek: number, startTime: string, endTime: string, available: boolean) {
     setSaving(true)

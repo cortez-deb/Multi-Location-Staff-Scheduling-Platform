@@ -8,11 +8,13 @@ type EventHandler = (event: SocketEvent, payload: SocketPayload) => void
 
 let _socket: Socket | null = null
 
-function getSocket(): Socket {
+function getSocket(token: string): Socket {
   if (!_socket) {
-    _socket = io({
-      path: '/api/socket',
-      // Use WebSocket first for lowest latency
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+    _socket = io(backendUrl, {
+      auth: {
+        token
+      },
       transports: ['websocket', 'polling'],
     })
   }
@@ -20,30 +22,16 @@ function getSocket(): Socket {
 }
 
 export function useSocket(
-  session: Pick<Session, 'userId' | 'role' | 'managedLocations' | 'certifiedLocations'>,
+  session: Session,
   onEvent: EventHandler
 ) {
   const cbRef = useRef(onEvent)
   cbRef.current = onEvent
 
   useEffect(() => {
-    const socket = getSocket()
+    if (!session?.accessToken) return;
 
-    // Join rooms
-    function join() {
-      socket.emit('join', {
-        userId: session.userId,
-        role: session.role,
-        managedLocations: session.managedLocations,
-        certifiedLocations: session.certifiedLocations,
-      })
-    }
-
-    if (socket.connected) {
-      join()
-    } else {
-      socket.on('connect', join)
-    }
+    const socket = getSocket(session.accessToken)
 
     // Listen to all ShiftSync events
     const events: SocketEvent[] = [
@@ -53,8 +41,10 @@ export function useSocket(
       'shift_updated',
     ]
 
-    const handler = (payload: SocketPayload) => {
-      cbRef.current(payload.event, payload)
+    const handler = (payload: any) => {
+      // The backend emits events directly with the event name and payload
+      // But we mapped it inside the handler below just in case it passes full payload
+      cbRef.current(payload?.event || 'notification', payload)
     }
 
     for (const ev of events) {
@@ -62,11 +52,10 @@ export function useSocket(
     }
 
     return () => {
-      socket.off('connect', join)
       for (const ev of events) {
         socket.off(ev, handler)
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.userId])
+  }, [session?.user?.id, session?.accessToken])
 }
