@@ -1,4 +1,5 @@
 'use client'
+import { DateTime } from 'luxon'
 import { Fragment, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -13,7 +14,6 @@ const SKILL_COLORS: Record<string, string> = {
   bartender: '#a78bfa', line_cook: '#fb923c', server: '#22d3ee',
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
-const SKILLS = ['bartender', 'line_cook', 'server', 'host', 'supervisor', 'expo', 'busser']
 
 type StaffInfo = { id: string; name: string; avatarInitials: string; avatarColor: string; skills: string[] }
 
@@ -33,6 +33,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(today)
   const [editShiftData, setEditShiftData] = useState<Partial<Shift> | null>(null)
   const [dragError, setDragError] = useState<string | null>(null)
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
@@ -200,14 +201,14 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
                   minHeight: 90,
                   borderLeft: isToday ? '2px solid rgba(99,102,241,0.3)' : undefined,
                 }}>
-                  {dayShifts.map(shift => (
-                    <ShiftCard key={shift.id} shift={shift} staffMap={staffMap} isManager={isManager} onClick={() => setSelectedShift(shift)} />
-                  ))}
+                    {dayShifts.map(shift => (
+                      <ShiftCard key={shift.id} shift={shift} staffMap={staffMap} isManager={isManager} onClick={() => setSelectedShift(shift)} skills={skills} />
+                    ))}
                   {isManager && (
                     <button
                       className="schedule-add-btn"
                       style={{ marginTop: dayShifts.length > 0 ? 4 : 0 }}
-                      onClick={() => setShowCreate(true)}
+                      onClick={() => { setSelectedDate(day); setShowCreate(true) }}
                     >+ Add</button>
                   )}
                 </Box>
@@ -223,7 +224,9 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         staffMap={staffMap}
         location={selectedShift ? locations.find(l => l.id === selectedShift.locationId)! : null}
         session={session}
+        skills={skills}
         onClose={() => setSelectedShift(null)}
+        onEdit={(s) => { setSelectedShift(null); setEditShiftData(s) }}
         onUpdate={() => { setSelectedShift(null); router.refresh() }}
       />
 
@@ -244,7 +247,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
           )}
           onClose={() => { setShowCreate(false); setEditShiftData(null) }}
           onSaved={() => { setShowCreate(false); setEditShiftData(null); router.refresh() }}
-          defaultDate={today}
+          defaultDate={selectedDate}
           initialShift={editShiftData}
           skills={skills}
         />
@@ -253,8 +256,11 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
   )
 }
 
-function ShiftCard({ shift, staffMap, isManager, onClick }: { shift: Shift; staffMap: Record<string, StaffInfo>; isManager: boolean; onClick: () => void }) {
-  const color = SKILL_COLORS[shift.requiredSkill] ?? '#6366f1'
+function ShiftCard({ shift, staffMap, isManager, onClick, skills }: { shift: Shift; staffMap: Record<string, StaffInfo>; isManager: boolean; onClick: () => void; skills: {id: string, name: string}[] }) {
+  const currentSkill = skills.find(s => s.id === shift.requiredSkill)
+  const skillLabel = currentSkill?.name || shift.requiredSkill
+  const skillSlug = (currentSkill?.name || shift.requiredSkill).toLowerCase().replace(' ', '_')
+  const color = SKILL_COLORS[skillSlug] ?? '#6366f1'
   const filled = shift.assignedStaff.length
   const pct = Math.round((filled / shift.headcount) * 100)
 
@@ -280,7 +286,7 @@ function ShiftCard({ shift, staffMap, isManager, onClick }: { shift: Shift; staf
     >
       <Group justify="space-between" align="center" gap={4}>
         <Text size="xs" fw={700} tt="uppercase" lts="0.04em" c={color}>
-          {shift.requiredSkill.replace('_', ' ')}
+          {skillLabel.replace('_', ' ')}
         </Text>
         <Group gap={4}>
           {shift.isPremium && <Text size="xs">⭐</Text>}
@@ -304,8 +310,8 @@ function ShiftCard({ shift, staffMap, isManager, onClick }: { shift: Shift; staf
   )
 }
 
-function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdate }: {
-  shift: Shift | null; staffMap: Record<string, StaffInfo>; location: Location | null; session: Session; onClose: () => void; onUpdate: () => void
+function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdate, onEdit, skills }: {
+  shift: Shift | null; staffMap: Record<string, StaffInfo>; location: Location | null; session: Session; onClose: () => void; onUpdate: () => void; onEdit: (s: Shift) => void; skills: {id: string, name: string}[]
 }) {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
@@ -324,25 +330,44 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
     else setMsg(d.error)
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const isLocked = shift ? new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000) : false
+
+  const currentSkill = skills.find(s => s.id === shift?.requiredSkill)
+  const skillLabel = currentSkill?.name || shift?.requiredSkill || ''
+  const skillSlug = skillLabel.toLowerCase().replace(' ', '_')
+
   async function deleteShift() {
-    if (!shift || !confirm('Delete this shift?')) return
     setLoading(true)
-    await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' })
+    await fetch(`/api/shifts/${shift?.id}`, { method: 'DELETE' })
     setLoading(false)
+    setShowDeleteConfirm(false)
     onUpdate()
   }
 
   return (
+    <>
+    <Modal opened={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete" size="sm" radius="md" centered zIndex={3000}>
+      <Stack gap="md">
+        <Text size="sm">Are you sure you want to delete this shift? This action cannot be undone.</Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => setShowDeleteConfirm(false)} size="xs">Cancel</Button>
+          <Button color="red" onClick={deleteShift} loading={loading} size="xs">Delete Shift</Button>
+        </Group>
+      </Stack>
+    </Modal>
+
     <Modal opened={!!shift} onClose={onClose} title={location?.shortName ?? 'Shift Detail'} size="md" radius="lg">
       {shift && (
         <Stack gap="md">
           <Group gap={8} wrap="wrap">
             <Badge size="sm" variant="light"
-              style={{ background: `${SKILL_COLORS[shift.requiredSkill] ?? '#6366f1'}22`, color: SKILL_COLORS[shift.requiredSkill] ?? '#6366f1' }}>
-              {shift.requiredSkill.replace('_', ' ')}
+              style={{ background: `${SKILL_COLORS[skillSlug] ?? '#6366f1'}22`, color: SKILL_COLORS[skillSlug] ?? '#6366f1' }}>
+              {skillLabel.replace('_', ' ')}
             </Badge>
             <Badge size="sm" color={shift.status === 'published' ? 'green' : 'gray'} variant="light">{shift.status}</Badge>
             {shift.isPremium && <Badge size="sm" color="yellow" variant="light">⭐ Premium</Badge>}
+            {isLocked && <Badge size="sm" color="red" variant="dot">Locked (Cutoff)</Badge>}
           </Group>
 
           <Text size="sm" c="dimmed">
@@ -374,12 +399,17 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
                       </Avatar>
                       <Text size="sm" fw={600} flex={1}>{s.name}</Text>
                       <Group gap={4}>
-                        {s.skills.map(sk => (
-                          <Badge key={sk} size="xs" variant="light"
-                            style={{ background: `${SKILL_COLORS[sk]}22`, color: SKILL_COLORS[sk] }}>
-                            {sk.replace('_', ' ')}
-                          </Badge>
-                        ))}
+                        {s.skills.map(sk => {
+                          const sObj = skills.find(apiS => apiS.id === sk)
+                          const sLabel = sObj?.name || sk
+                          const sSlug = sLabel.toLowerCase().replace(' ', '_')
+                          return (
+                            <Badge key={sk} size="xs" variant="light"
+                              style={{ background: `${SKILL_COLORS[sSlug] ?? '#6366f1'}22`, color: SKILL_COLORS[sSlug] ?? '#6366f1' }}>
+                              {sLabel.replace('_', ' ')}
+                            </Badge>
+                          )
+                        })}
                       </Group>
                     </Group>
                   )
@@ -394,14 +424,17 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
 
           {isManager && (
             <Group gap={8} wrap="wrap" pt={4}>
-              <Button size="sm" loading={loading} onClick={publish}
+              <Button size="sm" loading={loading} onClick={publish} disabled={isLocked}
                 variant="gradient" gradient={{ from: '#6366f1', to: '#4f46e5' }}>
                 {shift.status === 'published' ? '⬆ Unpublish' : '✓ Publish'}
               </Button>
               <Button component="a" href={`/shifts/${shift.id}`} size="sm" variant="default">
                 Manage Staff
               </Button>
-              <Button size="sm" color="red" variant="light" loading={loading} onClick={deleteShift} ml="auto">
+              <Button size="sm" variant="outline" onClick={() => onEdit(shift)} disabled={isLocked}>
+                Edit Shift
+              </Button>
+              <Button size="sm" color="red" variant="light" loading={loading} onClick={() => setShowDeleteConfirm(true)} ml="auto" disabled={isLocked}>
                 Delete
               </Button>
             </Group>
@@ -409,8 +442,17 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
         </Stack>
       )}
     </Modal>
+    </>
   )
 }
+
+const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
+  const h = Math.floor(i / 2)
+  const m = i % 2 === 0 ? '00' : '30'
+  const val = `${h.toString().padStart(2, '0')}:${m}`
+  const label = DateTime.fromFormat(val, 'HH:mm').toFormat('hh:mm a')
+  return { value: val, label }
+})
 
 function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, initialShift, skills }: {
   opened: boolean; locations: Location[]; onClose: () => void; onSaved: () => void; defaultDate: string; initialShift?: Partial<Shift> | null; skills: { id: string, name: string }[]
@@ -420,7 +462,7 @@ function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, init
     date: initialShift?.date || defaultDate,
     startTime: initialShift?.startTime || '10:00',
     endTime: initialShift?.endTime || '18:00',
-    requiredSkill: initialShift?.requiredSkill || 'server',
+    requiredSkill: initialShift?.requiredSkill || (skills.find(s => s.name === 'Server')?.id || skills[0]?.id || ''),
     headcount: initialShift?.headcount || 1,
     notes: initialShift?.notes || '',
   })
@@ -435,11 +477,11 @@ function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, init
     setLoading(true)
     const isEdit = !!initialShift?.id
     const url = isEdit ? `/api/shifts/${initialShift.id}` : '/api/shifts'
-    const method = isEdit ? 'PUT' : 'POST'
+    const method = isEdit ? 'PATCH' : 'POST'
 
-    // Map string requiredSkill to UUID skillId
-    const skillObj = skills.find(s => s.name === form.requiredSkill) || skills.find(s => s.name.toLowerCase() === form.requiredSkill.toLowerCase())
-    const skillId = skillObj?.id
+    // Map requiredSkill to ID (it might be name or ID depending on initialShift)
+    const skillObj = skills.find(s => s.id === form.requiredSkill || s.name === form.requiredSkill)
+    const skillId = skillObj?.id || form.requiredSkill
 
     // Get location timezone
     const loc = locations.find(l => l.id === form.locationId)
@@ -463,8 +505,11 @@ function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, init
     })
     const d = await res.json()
     setLoading(false)
-    if (d.success) onSaved()
-    else setError(d.error)
+    if (res.ok) {
+      onSaved()
+    } else {
+      setError(d.message || d.error || 'Failed to save shift')
+    }
   }
 
   return (
@@ -488,27 +533,30 @@ function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, init
             />
           </Group>
           <Group grow>
-            <TextInput
+            <Select
               label="Start Time"
-              type="time"
+              data={TIME_OPTIONS}
               value={form.startTime}
-              onChange={e => set('startTime', e.target.value)}
+              onChange={v => set('startTime', v ?? '10:00')}
+              searchable
               required
             />
-            <TextInput
+            <Select
               label="End Time"
-              type="time"
+              data={TIME_OPTIONS}
               value={form.endTime}
-              onChange={e => set('endTime', e.target.value)}
+              onChange={v => set('endTime', v ?? '18:00')}
+              searchable
               required
             />
           </Group>
           <Group grow>
             <Select
               label="Required Skill"
-              data={SKILLS.map(s => ({ value: s, label: s.replace('_', ' ') }))}
-              value={form.requiredSkill}
-              onChange={v => set('requiredSkill', v ?? 'server')}
+              data={skills.map(s => ({ value: s.id, label: s.name }))}
+              value={skills.find(s => s.name === form.requiredSkill || s.id === form.requiredSkill)?.id}
+              onChange={v => set('requiredSkill', v ?? (skills[0]?.id || ''))}
+              required
             />
             <NumberInput
               label="Headcount"

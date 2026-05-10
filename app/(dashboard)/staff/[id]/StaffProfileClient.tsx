@@ -1,14 +1,16 @@
 'use client'
 import { useState } from 'react'
+import { Text } from '@mantine/core'
 import { useRouter } from 'next/navigation'
 import type { Session, Location, RecurringAvailability, AvailabilityException, Shift } from '@/lib/types'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function StaffProfileClient({ session, user, locations, availability, recentShifts }: {
+export function StaffProfileClient({ session, user, locations, availability, recentShifts, history }: {
   session: Session; user: any; locations: Location[]
   availability: { recurring: RecurringAvailability[]; exceptions: AvailabilityException[] }
   recentShifts: Shift[]
+  history?: any[]
 }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -51,7 +53,10 @@ export function StaffProfileClient({ session, user, locations, availability, rec
             <span className={`badge ${user.role === 'manager' ? 'badge-warning' : 'badge-info'}`}>{user.role}</span>
             {!user.isActive && <span className="badge badge-error">Inactive</span>}
           </div>
-          <div style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12 }}>{user.email} {user.phone && `· ${user.phone}`}</div>
+          <div style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 4 }}>{user.email} {user.phone && `· ${user.phone}`}</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+            Reports to: {user.role === 'admin' ? '—' : user.role === 'manager' ? 'Admin' : (user.manager?.name || 'Unassigned')}
+          </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
             {user.skills.map((sk: string) => <span key={sk} className={`badge skill-${sk}`}>{sk.replace('_',' ')}</span>)}
           </div>
@@ -138,6 +143,30 @@ export function StaffProfileClient({ session, user, locations, availability, rec
           </div>
         </div>
       </div>
+      
+      {session.user.role === 'admin' && history && history.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>Reporting History</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {history.map(item => (
+              <div key={item.id} style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.supersededAt ? 'var(--color-border)' : '#10b981' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text size="sm" fw={600}>
+                      {item.manager ? item.manager.name : <span style={{ color: 'var(--color-text-muted)' }}>Unassigned</span>}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {new Date(item.assignedAt).toLocaleDateString()} – {item.supersededAt ? new Date(item.supersededAt).toLocaleDateString() : 'Present'}
+                    </Text>
+                  </div>
+                  <Text size="xs" c="dimmed">Assigned by {item.assignedBy?.name || 'System'}</Text>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -71,10 +71,13 @@ export async function updateShift(req, res, next) {
     if (!shift) return res.status(404).json({ error: 'NOT_FOUND', message: 'Shift not found' });
 
     const before = shift.toJSON();
-    const { startUtc, endUtc, headcount } = req.body;
+    const { locationId, skillId, startUtc, endUtc, headcount, notes } = req.body;
+    if (locationId !== undefined) shift.locationId = locationId;
+    if (skillId !== undefined) shift.skillId = skillId;
     if (startUtc !== undefined) shift.startUtc = startUtc;
     if (endUtc !== undefined) shift.endUtc = endUtc;
     if (headcount !== undefined) shift.headcount = headcount;
+    if (notes !== undefined) shift.notes = notes;
 
     await shift.save();
     await logAudit(req.user.userId, 'Shift', shift.id, 'SHIFT_UPDATED', before, shift.toJSON());

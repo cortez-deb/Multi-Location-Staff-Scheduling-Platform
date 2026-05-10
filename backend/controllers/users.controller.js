@@ -5,13 +5,16 @@ import {
 import { logAudit } from '../utils/auditLogger.js';
 import { notify } from '../utils/notificationHelper.js';
 import { getIO } from '../sockets/index.js';
+import * as reportingService from '../services/reporting.service.js';
+import { ReportingHistory } from '../models/index.js';
 
 export async function getAllUsers(req, res, next) {
   try {
     const includeConfig = [
       { model: Location, as: 'certifiedLocations' },
       { model: Location, as: 'managedLocations' },
-      { model: Skill, as: 'skills' }
+      { model: Skill, as: 'skills' },
+      { model: User, as: 'manager', attributes: ['id', 'name'], required: false }
     ];
 
     let users = await User.findAll({
@@ -51,7 +54,17 @@ export async function getAllUsers(req, res, next) {
 export async function getUser(req, res, next) {
   try {
     const user = await User.findByPk(req.params.id, {
-      attributes: { exclude: ['passwordHash'] }
+      attributes: { exclude: ['passwordHash'] },
+      include: [
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] },
+        { 
+          model: ReportingHistory,
+          as: 'reportingHistory',
+          where: { supersededAt: null },
+          required: false,
+          include: [{ model: User, as: 'assignedBy', attributes: ['id', 'name'] }]
+        }
+      ]
     });
     if (!user) return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
     res.json(user);
@@ -62,18 +75,91 @@ export async function getUser(req, res, next) {
 
 export async function updateUser(req, res, next) {
   try {
-    const { name, desiredHours, notifyInApp, notifyEmail } = req.body;
-    const user = await User.findByPk(req.params.id);
+    const { name, email, role, desiredHours, notifyInApp, notifyEmail, skills, locations, isActive, phone, hireDate } = req.body;
+    const userId = req.params.id;
+    const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
 
     const before = user.toJSON();
+    const isAdmin = req.user.role === 'admin';
+    const isManager = req.user.role === 'manager';
 
-    if (name !== undefined) user.name = name;
+    // Permission check for manager
+    let managedLocIds = [];
+    if (isManager) {
+      const mls = await ManagerLocation.findAll({ where: { userId: req.user.userId } });
+      managedLocIds = mls.map(ml => ml.locationId);
+      
+      const uls = await UserLocation.findAll({ where: { userId } });
+      const userLocIds = uls.map(ul => ul.locationId);
+      
+      const hasOverlap = userLocIds.some(id => managedLocIds.includes(id));
+      if (!isAdmin && !hasOverlap) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'You do not manage this user' });
+      }
+    }
+
+    // Only Admin can change core fields
+    if (isAdmin) {
+      if (name !== undefined) user.name = name;
+      if (email !== undefined) user.email = email;
+      if (role !== undefined) user.role = role;
+    }
+
+    // Common fields
     if (desiredHours !== undefined) user.desiredHours = desiredHours;
     if (notifyInApp !== undefined) user.notifyInApp = notifyInApp;
     if (notifyEmail !== undefined) user.notifyEmail = notifyEmail;
+    if (isActive !== undefined) user.isActive = isActive;
+    if (phone !== undefined) user.phone = phone;
+    if (hireDate !== undefined) user.hireDate = hireDate;
 
     await user.save();
+
+    // Sync skills (Admin or Manager of user's location)
+    if (skills && Array.isArray(skills)) {
+      if (isAdmin) {
+        await UserSkill.destroy({ where: { userId: user.id } });
+        for (const skillId of skills) {
+          await UserSkill.create({ userId: user.id, skillId });
+        }
+      } else if (isManager) {
+        // Managers can only manage skills if they manage the user
+        // (already checked hasOverlap above)
+        await UserSkill.destroy({ where: { userId: user.id } });
+        for (const skillId of skills) {
+          await UserSkill.create({ userId: user.id, skillId });
+        }
+      }
+    }
+
+    // Sync locations (Admin or Manager)
+    if (locations && Array.isArray(locations)) {
+      if (isAdmin) {
+        await UserLocation.destroy({ where: { userId: user.id } });
+        for (const locationId of locations) {
+          await UserLocation.create({ userId: user.id, locationId });
+        }
+      } else if (isManager) {
+        // Managers can only add/remove certifications for locations THEY manage
+        // Fetch all current certifications
+        const currentLocs = await UserLocation.findAll({ where: { userId: user.id } });
+        
+        // Remove certifications for locations manager manages that are not in the new list
+        for (const cl of currentLocs) {
+          if (managedLocIds.includes(cl.locationId) && !locations.includes(cl.locationId)) {
+            await cl.destroy();
+          }
+        }
+        
+        // Add new certifications only for locations manager manages
+        for (const locId of locations) {
+          if (managedLocIds.includes(locId)) {
+            await UserLocation.findOrCreate({ where: { userId: user.id, locationId: locId } });
+          }
+        }
+      }
+    }
 
     await logAudit(req.user.userId, 'User', user.id, 'USER_UPDATED', before, user.toJSON());
 
@@ -294,3 +380,65 @@ export async function removeLocation(req, res, next) {
     next(err);
   }
 }
+
+export async function assignManager(req, res, next) {
+  try {
+    const { managerId } = req.body;
+    const staffId = req.params.id;
+    const user = await reportingService.assignManager(staffId, managerId, req.user.userId);
+    res.json(user);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ error: 'BAD_REQUEST', message: err.message });
+    }
+    next(err);
+  }
+}
+
+export async function getManager(req, res, next) {
+  try {
+    const user = await User.findByPk(req.params.id, {
+      include: [{
+        model: User,
+        as: 'manager',
+        attributes: ['id', 'name', 'email', 'role']
+      }]
+    });
+    if (!user) return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+    res.json({ manager: user.manager });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getReportingHistory(req, res, next) {
+  try {
+    const history = await reportingService.getReportingHistory(req.params.id);
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getDirectReports(req, res, next) {
+  try {
+    // Permission check: admin or the manager themselves
+    if (req.user.role !== 'admin' && req.user.userId !== req.params.id) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied' });
+    }
+
+    // Confirm target user is manager (if self) or any (if admin)
+    const targetUser = await User.findByPk(req.params.id);
+    if (!targetUser) return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+    
+    if (targetUser.role !== 'manager' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Only managers have direct reports' });
+    }
+
+    const reports = await reportingService.getDirectReports(req.params.id);
+    res.json(reports);
+  } catch (err) {
+    next(err);
+  }
+}
+

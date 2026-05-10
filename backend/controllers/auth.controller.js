@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { User, RefreshToken } from '../models/index.js';
+import { User, RefreshToken, UserSkill, UserLocation } from '../models/index.js';
 import { AuthError, ValidationError } from '../middleware/errorHandler.js';
+import * as reportingService from '../services/reporting.service.js';
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -19,7 +20,7 @@ const generateTokens = (user) => {
 
 export async function register(req, res, next) {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, skills, locations } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
@@ -35,6 +36,27 @@ export async function register(req, res, next) {
       passwordHash,
       role
     });
+
+    // Add skills if provided
+    if (skills && Array.isArray(skills)) {
+      for (const skillId of skills) {
+        await UserSkill.create({ userId: user.id, skillId });
+      }
+    }
+
+    // Add locations if provided
+    if (locations && Array.isArray(locations)) {
+      for (const locationId of locations) {
+        await UserLocation.create({ userId: user.id, locationId });
+      }
+    }
+
+    try {
+      const actorId = req.user ? req.user.userId : user.id;
+      await reportingService.onStaffCreated(user.id, actorId);
+    } catch (hookErr) {
+      console.error('[reporting] failed to seed history on create:', hookErr);
+    }
 
     res.status(201).json({ message: 'User registered successfully', userId: user.id });
   } catch (err) {

@@ -110,6 +110,7 @@ export interface AvailabilityException {
 export interface Shift {
   id: string
   locationId: LocationId
+  startUtc: string
   date: string // ISO "YYYY-MM-DD" in location's timezone
   startTime: string // "HH:MM" local to location
   endTime: string // "HH:MM" local (may be next day = overnight if endTime < startTime)

@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 export class ApiUnauthorizedError extends Error {
   constructor() { super('Unauthorized'); this.name = 'ApiUnauthorizedError'; }
@@ -9,7 +10,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const sessionCookie = cookieStore.get('shiftsync_session');
 
   if (!sessionCookie) {
-    throw new ApiUnauthorizedError();
+    redirect('/logout');
   }
 
   let token = '';
@@ -17,7 +18,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     const session = JSON.parse(sessionCookie.value);
     token = session.accessToken;
   } catch {
-    throw new ApiUnauthorizedError();
+    redirect('/logout');
   }
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
@@ -37,11 +38,12 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   });
 
   if (res.status === 401) {
-    throw new ApiUnauthorizedError();
+    redirect('/logout');
   }
 
   if (!res.ok) {
-    throw new Error(`API Error: ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    throw new Error(`API Error: ${res.status} ${res.statusText} - ${text}`);
   }
 
   if (res.status === 204) {

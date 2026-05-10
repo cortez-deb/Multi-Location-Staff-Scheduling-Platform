@@ -15,6 +15,7 @@ import SwapRequestFactory from './SwapRequest.js';
 import RefreshTokenFactory from './RefreshToken.js';
 import NotificationFactory from './Notification.js';
 import AuditLogFactory from './AuditLog.js';
+import ReportingHistoryFactory from './ReportingHistory.js';
 
 const env = process.env.NODE_ENV || 'development';
 const config = databaseConfig[env];
@@ -35,8 +36,19 @@ const SwapRequest = SwapRequestFactory(sequelize);
 const RefreshToken = RefreshTokenFactory(sequelize);
 const Notification = NotificationFactory(sequelize);
 const AuditLog = AuditLogFactory(sequelize);
+const ReportingHistory = ReportingHistoryFactory(sequelize);
 
 // --- Associations ---
+
+// User reporting relationships
+User.belongsTo(User, { foreignKey: 'reportsToId', as: 'manager' });
+User.hasMany(User, { foreignKey: 'reportsToId', as: 'directReports' });
+
+// ReportingHistory
+ReportingHistory.belongsTo(User, { foreignKey: 'staffId', as: 'staff' });
+ReportingHistory.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
+ReportingHistory.belongsTo(User, { foreignKey: 'assignedById', as: 'assignedBy' });
+User.hasMany(ReportingHistory, { foreignKey: 'staffId', as: 'reportingHistory' });
 
 // User <-> Location (Certification)
 User.belongsToMany(Location, { through: UserLocation, foreignKey: 'userId', as: 'certifiedLocations' });
@@ -121,4 +133,5 @@ export {
   RefreshToken,
   Notification,
   AuditLog,
+  ReportingHistory,
 };

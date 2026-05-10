@@ -28,6 +28,7 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
       allStaff={allStaff}
       auditLogs={auditLogs}
       performerMap={performerMap}
+      apiSkills={db.skills}
     />
   )
 }

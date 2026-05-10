@@ -8,6 +8,17 @@ const router = Router();
 
 router.use(authenticate);
 
+// Reporting Relationships
+router.patch('/:id/manager', [
+  requireRole('admin'),
+  body('managerId').optional({ nullable: true }).isUUID(),
+  validate
+], usersController.assignManager);
+
+router.get('/:id/manager', requireSelfOrAdmin(), usersController.getManager);
+router.get('/:id/manager/history', requireRole('admin'), usersController.getReportingHistory);
+router.get('/:id/direct-reports', requireSelfOrAdmin(), usersController.getDirectReports);
+
 router.get('/', usersController.getAllUsers);
 
 router.get('/:id', requireSelfOrAdmin(), usersController.getUser);
@@ -15,9 +26,13 @@ router.get('/:id', requireSelfOrAdmin(), usersController.getUser);
 router.patch('/:id', [
   requireSelfOrAdmin(),
   body('name').optional().notEmpty(),
+  body('email').optional().isEmail(),
+  body('role').optional().isIn(['admin', 'manager', 'staff']),
   body('desiredHours').optional().isInt({ min: 0 }),
   body('notifyInApp').optional().isBoolean(),
   body('notifyEmail').optional().isBoolean(),
+  body('skills').optional().isArray(),
+  body('locations').optional().isArray(),
   validate
 ], usersController.updateUser);
 

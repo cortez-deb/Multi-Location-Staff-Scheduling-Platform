@@ -30,9 +30,12 @@ router.get('/:id', shiftsController.getShift);
 
 router.patch('/:id', [
   requireRole('admin', 'manager'),
+  body('locationId').optional().isUUID(),
+  body('skillId').optional().isUUID(),
   body('startUtc').optional().isISO8601(),
   body('endUtc').optional().isISO8601(),
   body('headcount').optional().isInt({ min: 1 }),
+  body('notes').optional().isString(),
   validate
 ], shiftsController.updateShift);
 

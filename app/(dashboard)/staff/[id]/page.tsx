@@ -10,7 +10,9 @@ export default async function StaffProfilePage({ params }: { params: Promise<{ i
 
   const db = await getDb()
   const { id } = await params
-  const user = await findUser(id)
+  
+  // Use backend API to get full user details including manager and current history
+  const user = await fetchApi(`/api/users/${id}`)
   if (!user) notFound()
 
   // Staff can only view own profile
@@ -24,6 +26,13 @@ export default async function StaffProfilePage({ params }: { params: Promise<{ i
     recurring: availabilityRes.availabilities || [], 
     exceptions: availabilityRes.exceptions || [] 
   }
+
+  // Fetch reporting history if admin
+  let history = []
+  if (session.user.role === 'admin') {
+    history = await fetchApi(`/api/users/${id}/manager/history`)
+  }
+
   const userShifts = db.shifts.filter(s => s.assignedStaff.includes(id) && s.status === 'published').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
 
   return (
@@ -33,6 +42,7 @@ export default async function StaffProfilePage({ params }: { params: Promise<{ i
       locations={locations}
       availability={availability}
       recentShifts={userShifts}
+      history={history}
     />
   )
 }

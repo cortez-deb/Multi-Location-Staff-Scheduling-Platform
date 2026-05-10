@@ -10,9 +10,10 @@ const SKILL_COLORS: Record<string, string> = {
 
 type SafeUser = { id: string; name: string; skills: string[]; certifiedLocations: string[]; avatarInitials: string; avatarColor: string }
 
-export function ShiftDetailClient({ session, shift, location, allStaff, auditLogs, performerMap }: {
+export function ShiftDetailClient({ session, shift, location, allStaff, auditLogs, performerMap, apiSkills }: {
   session: Session; shift: Shift; location: Location
   allStaff: SafeUser[]; auditLogs: AuditLog[]; performerMap: Record<string, string>
+  apiSkills?: { id: string, name: string }[]
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -75,6 +76,12 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
 
   const isFull = shift.assignedStaff.length >= shift.headcount
 
+  const isLocked = new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000)
+
+  const currentSkill = apiSkills?.find(s => s.id === shift.requiredSkill)
+  const skillLabel = currentSkill?.name || shift.requiredSkill
+  const skillSlug = (currentSkill?.name || shift.requiredSkill).toLowerCase().replace(' ', '_')
+
   return (
     <div style={{ padding: '28px 32px 40px', maxWidth: 900, margin: '0 auto' }}>
       {/* Back */}
@@ -85,22 +92,31 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <span className={`badge skill-${shift.requiredSkill}`}>{shift.requiredSkill.replace('_',' ')}</span>
+              <span className={`badge skill-${skillSlug}`}>{skillLabel}</span>
               <span className={`badge ${shift.status === 'published' ? 'badge-published' : 'badge-draft'}`}>{shift.status}</span>
               {shift.isPremium && <span className="badge badge-premium">⭐ Premium</span>}
               {shift.isOvernight && <span className="badge badge-info">🌙 Overnight</span>}
+              {isLocked && <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>🔒 Locked</span>}
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{location.shortName}</h1>
             <p style={{ color: 'var(--color-text-muted)', margin: '6px 0 0', fontSize: 14 }}>
               {shift.date} · {shift.startTime}–{shift.endTime} · {location.timezone}
             </p>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '4px 0 0' }}>{location.address}</p>
+            {shift.notes && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13 }}>
+                <strong style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 4, letterSpacing: '0.05em' }}>Manager Notes</strong>
+                <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{shift.notes}</span>
+              </div>
+            )}
           </div>
           {isManager && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className={`btn btn-sm ${shift.status === 'published' ? 'btn-secondary' : 'btn-primary'}`} onClick={togglePublish} disabled={loading}>
-                {shift.status === 'published' ? '⬆ Unpublish' : '✓ Publish'}
-              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-primary" onClick={togglePublish} disabled={loading || isLocked} style={{ opacity: isLocked ? 0.6 : 1 }}>
+                  {shift.status === 'published' ? 'Unpublish' : 'Publish'}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -143,11 +159,18 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
                       <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-                        {s.skills.map(sk => <span key={sk} className={`badge skill-${sk}`} style={{ fontSize: 9 }}>{sk.replace('_',' ')}</span>)}
+                        {s.skills.map(sk => {
+                          const sObj = apiSkills?.find(apiS => apiS.id === sk)
+                          const sLabel = sObj?.name || sk
+                          const sSlug = sLabel.toLowerCase().replace(' ', '_')
+                          return <span key={sk} className={`badge skill-${sSlug}`} style={{ fontSize: 9 }}>{sLabel}</span>
+                        })}
                       </div>
                     </div>
                     {isManager && (
-                      <button className="btn btn-danger btn-sm" onClick={() => unassign(sid)} disabled={loading}>Remove</button>
+                      <button className="btn btn-sm" onClick={() => unassign(sid)} disabled={loading || isLocked} style={{ color: '#ef4444', opacity: isLocked ? 0.5 : 1 }}>
+                        Unassign
+                      </button>
                     )}
                   </div>
                 )
@@ -158,10 +181,12 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
 
         {/* Add Staff */}
         {isManager && !isFull && (
-          <div className="card">
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>Add Staff</h2>
+          <div className="card" style={{ opacity: isLocked ? 0.7 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
+              {isLocked ? 'Staff Assigned' : 'Add Staff'}
+            </h2>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
-              Showing {eligible.length} eligible ({shift.requiredSkill.replace('_',' ')} + certified)
+              {isLocked ? 'Assignment is locked for this shift.' : `Showing ${eligible.length} eligible (${skillLabel} + certified)`}
             </p>
 
             {/* Violation messages */}

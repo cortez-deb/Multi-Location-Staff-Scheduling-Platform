@@ -35,6 +35,10 @@ export default (sequelize) => {
       type: DataTypes.INTEGER,
       defaultValue: 48,
     },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   }, {
     sequelize,
     modelName: 'Shift',

@@ -1,12 +1,14 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Box, Group, Stack, Text, Title, TextInput, Select, Badge, Avatar,
-  Table, Modal, Button, MultiSelect, Switch,
+  Table, Modal, Button, MultiSelect, Switch, Stepper, PasswordInput
 } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
 import type { Session, Location } from '@/lib/types'
-import { addUser, updateUser } from '@/app/actions/staff'
+import { addUser, updateUser, assignManager } from '@/app/actions/staff'
 
 const SKILL_LABELS: Record<string, string> = {
   bartender: 'Bartender', line_cook: 'Line Cook', server: 'Server',
@@ -18,30 +20,50 @@ const SKILL_COLORS: Record<string, string> = {
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
 
+const COLORS = ['#a78bfa', '#fb923c', '#22d3ee', '#34d399', '#fbbf24', '#fb7185', '#94a3b8']
+const getColor = (str: string) => {
+  if (SKILL_COLORS[str]) return SKILL_COLORS[str]
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COLORS[Math.abs(hash) % COLORS.length];
+}
+
 const ROLE_COLOR: Record<string, string> = { admin: 'red', manager: 'yellow', staff: 'cyan' }
 
-export function StaffClient({ session, users, locations, weeklyHours }: {
-  session: Session; users: any[]; locations: Location[]; weeklyHours: Record<string, number>
+export function StaffClient({ session, users, locations, weeklyHours, apiLocations, apiSkills }: {
+  session: Session; users: any[]; locations: Location[]; weeklyHours: Record<string, number>;
+  apiLocations?: any[]; apiSkills?: any[]
 }) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterLoc, setFilterLoc] = useState<string | null>(null)
   const [filterSkill, setFilterSkill] = useState<string | null>(null)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [activeStep, setActiveStep] = useState(0)
   const [editingUser, setEditingUser] = useState<any | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    password: '',
     role: 'staff' as 'admin' | 'manager' | 'staff',
     skills: [] as string[],
     certifiedLocations: [] as string[],
     isActive: true,
   })
 
+  const locOptions = (apiLocations?.length ? apiLocations : locations).map(l => ({ value: l.id, label: l.name || l.shortName }))
+  const skillOptions = apiSkills?.length 
+    ? apiSkills.map(s => ({ value: s.id, label: s.name }))
+    : Object.entries(SKILL_LABELS).map(([k, v]) => ({ value: k, label: v }))
+
   const handleOpenAdd = () => {
     setEditingUser(null)
-    setFormData({ name: '', email: '', role: 'staff', skills: [], certifiedLocations: [], isActive: true })
+    setActiveStep(0)
+    setFormData({ name: '', email: '', password: '', role: 'staff', skills: [], certifiedLocations: [], isActive: true })
     setIsModalOpen(true)
   }
 
@@ -52,6 +74,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
     setFormData({
       name: u.name,
       email: u.email,
+      password: '',
       role: u.role,
       skills: u.skills || [],
       certifiedLocations: u.certifiedLocations || [],
@@ -64,12 +87,37 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
     if (!formData.name || !formData.email || formData.certifiedLocations.length === 0) return
     setIsSaving(true)
     try {
+      let res;
       if (editingUser) {
-        await updateUser(editingUser.id, formData as any)
+        res = await updateUser(editingUser.id, formData as any)
       } else {
-        await addUser(formData as any)
+        res = await addUser(formData as any)
       }
-      setIsModalOpen(false)
+      
+      if (res?.success) {
+        notifications.show({
+          title: editingUser ? 'User Updated' : 'User Added',
+          message: `${formData.name} has been successfully ${editingUser ? 'updated' : 'registered'}.`,
+          color: 'green',
+          radius: 'md',
+        })
+        setIsModalOpen(false)
+        router.refresh()
+      } else {
+        notifications.show({
+          title: 'Error Saving User',
+          message: res?.error || 'Failed to save user',
+          color: 'red',
+          radius: 'md',
+        })
+      }
+    } catch (err: any) {
+      notifications.show({
+        title: 'Unexpected Error',
+        message: err.message || 'An unexpected error occurred',
+        color: 'red',
+        radius: 'md',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -81,6 +129,18 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
     if (filterSkill && !u.skills.includes(filterSkill)) return false
     return true
   })
+
+  const nextStep = () => setActiveStep((current) => (current < 2 ? current + 1 : current))
+  const prevStep = () => setActiveStep((current) => (current > 0 ? current - 1 : current))
+
+  const passwordReqs = [
+    { label: 'At least 8 characters', valid: formData.password.length >= 8 },
+    { label: 'Contains a number', valid: /[0-9]/.test(formData.password) },
+    { label: 'Contains uppercase letter', valid: /[A-Z]/.test(formData.password) },
+    { label: 'Contains lowercase letter', valid: /[a-z]/.test(formData.password) },
+    { label: 'Contains special character', valid: /[^A-Za-z0-9]/.test(formData.password) },
+  ]
+  const isPasswordValid = passwordReqs.every(r => r.valid)
 
   return (
     <Box p={32} pb={48}>
@@ -106,7 +166,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
           />
           <Select
             placeholder="All Locations"
-            data={locations.map(l => ({ value: l.id, label: l.shortName }))}
+            data={locOptions}
             value={filterLoc}
             onChange={setFilterLoc}
             clearable
@@ -114,7 +174,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
           />
           <Select
             placeholder="All Skills"
-            data={Object.entries(SKILL_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+            data={skillOptions}
             value={filterSkill}
             onChange={setFilterSkill}
             clearable
@@ -132,6 +192,7 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
               <Table.Th>Role</Table.Th>
               <Table.Th>Skills</Table.Th>
               <Table.Th>Locations</Table.Th>
+              <Table.Th>Reports to</Table.Th>
               <Table.Th>This Week</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -173,20 +234,25 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4}>
-                      {user.skills.map((sk: string) => (
-                        <Badge
-                          key={sk}
-                          size="xs"
-                          variant="light"
-                          style={{
-                            background: `${SKILL_COLORS[sk]}22`,
-                            color: SKILL_COLORS[sk],
-                            border: `1px solid ${SKILL_COLORS[sk]}44`,
-                          }}
-                        >
-                          {sk.replace('_', ' ')}
-                        </Badge>
-                      ))}
+                      {user.skills.map((sk: any) => {
+                        const apiSkill = apiSkills?.find(s => s.id === sk)
+                        const label = apiSkill ? apiSkill.name : (typeof sk === 'string' ? sk.replace('_', ' ') : 'Unknown')
+                        const color = getColor(sk)
+                        return (
+                          <Badge
+                            key={sk}
+                            size="xs"
+                            variant="light"
+                            style={{
+                              background: `${getColor(label.toLowerCase().replace(' ', '_'))}22`,
+                              color: getColor(label.toLowerCase().replace(' ', '_')),
+                              border: `1px solid ${getColor(label.toLowerCase().replace(' ', '_'))}44`,
+                            }}
+                          >
+                            {label}
+                          </Badge>
+                        )
+                      })}
                     </Group>
                   </Table.Td>
                   <Table.Td>
@@ -200,8 +266,41 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
                     </Group>
                   </Table.Td>
                   <Table.Td>
+                    {user.role === 'admin' ? (
+                      <Text size="sm" c="dimmed" style={{ paddingLeft: 12 }}>—</Text>
+                    ) : user.role === 'manager' ? (
+                      <Text size="sm" style={{ paddingLeft: 12 }}>Admin</Text>
+                    ) : session.user.role === 'admin' ? (
+                      <Select
+                        size="xs"
+                        variant="unstyled"
+                        placeholder="Unassigned"
+                        data={[
+                          { value: 'null', label: 'Unassigned' },
+                          ...users.filter(u => u.role === 'manager').map(m => ({ value: m.id, label: m.name }))
+                        ]}
+                        value={user.reportsToId || 'null'}
+                        onChange={async (val) => {
+                          const mId = val === 'null' ? null : val
+                          const res = await assignManager(user.id, mId)
+                          if (!res.success) {
+                            notifications.show({ title: 'Error', message: res.error, color: 'red' })
+                          } else {
+                            notifications.show({ title: 'Manager Updated', message: `Reporting manager for ${user.name} updated.`, color: 'green' })
+                          }
+                        }}
+                        style={{ width: 140 }}
+                        c={!user.reportsToId ? 'dimmed' : undefined}
+                      />
+                    ) : (
+                      <Text size="sm" c={!user.manager ? 'dimmed' : undefined} style={{ paddingLeft: 12 }}>
+                        {user.manager ? user.manager.name : 'Unassigned'}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
                     <Group justify="space-between" wrap="nowrap">
-                      <Text size="sm" fw={700} c={isOvertime ? 'red' : isNearOT ? 'yellow' : 'gray.0'}>
+                      <Text size="sm" fw={700} c={isOvertime ? 'red' : isNearOT ? 'yellow' : undefined}>
                         {hours}h / {user.desiredHoursPerWeek}h
                         {isOvertime && (
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 14, height: 14, marginLeft: 4, display: 'inline-block'}}>
@@ -214,7 +313,8 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
                           </svg>
                         )}
                       </Text>
-                      {session.user.role === 'admin' && (
+                      {(session.user.role === 'admin' || 
+                        (session.user.role === 'manager' && user.certifiedLocations.some((l: string) => session.managedLocations.includes(l as any)))) && (
                         <Button size="compact-xs" variant="light" onClick={(e) => handleOpenEdit(e, user)}>Edit</Button>
                       )}
                     </Group>
@@ -237,61 +337,148 @@ export function StaffClient({ session, users, locations, weeklyHours }: {
         )}
       </Table.ScrollContainer>
 
-      <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title={<Text fw={700}>{editingUser ? 'Edit User' : 'Add User'}</Text>} radius="md">
-        <Stack gap="md">
-          <TextInput
-            label="Name"
-            placeholder="John Doe"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
-            required
-            data-autofocus
-          />
-          <TextInput
-            label="Email"
-            placeholder="john@coastaleats.com"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.currentTarget.value })}
-            required
-          />
-          <Select
-            label="Role"
-            data={[
-              { value: 'staff', label: 'Staff' },
-              { value: 'manager', label: 'Manager' },
-              { value: 'admin', label: 'Admin' },
-            ]}
-            value={formData.role}
-            onChange={(val) => setFormData({ ...formData, role: (val || 'staff') as any })}
-            required
-          />
-          <MultiSelect
-            label="Certified Locations"
-            data={locations.map(l => ({ value: l.id, label: l.name }))}
-            value={formData.certifiedLocations}
-            onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
-            required
-            searchable
-          />
-          <MultiSelect
-            label="Skills"
-            data={Object.entries(SKILL_LABELS).map(([k, v]) => ({ value: k, label: v }))}
-            value={formData.skills}
-            onChange={(val) => setFormData({ ...formData, skills: val })}
-            searchable
-          />
-          {editingUser && (
+      <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title={<Text fw={700}>{editingUser ? 'Edit User' : 'Add User'}</Text>} radius="md" size={editingUser ? 'sm' : 'lg'}>
+        {editingUser ? (
+          <Stack gap="md">
+            <TextInput
+              label="Name"
+              placeholder="John Doe"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+              required
+              data-autofocus
+            />
+            <TextInput
+              label="Email"
+              placeholder="john@coastaleats.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.currentTarget.value })}
+              required
+            />
+            <Select
+              label="Role"
+              data={[
+                { value: 'staff', label: 'Staff' },
+                { value: 'manager', label: 'Manager' },
+                { value: 'admin', label: 'Admin' },
+              ]}
+              value={formData.role}
+              onChange={(val) => setFormData({ ...formData, role: (val || 'staff') as any })}
+              required
+            />
+            <MultiSelect
+              label="Certified Locations"
+              data={locOptions}
+              value={formData.certifiedLocations}
+              onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
+              required
+              searchable
+            />
+            <MultiSelect
+              label="Skills"
+              data={skillOptions}
+              value={formData.skills}
+              onChange={(val) => setFormData({ ...formData, skills: val })}
+              searchable
+            />
             <Switch
               label="Active Employee"
               checked={formData.isActive}
               onChange={(e) => setFormData({ ...formData, isActive: e.currentTarget.checked })}
             />
-          )}
-          <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={() => setIsModalOpen(false)} color="gray">Cancel</Button>
-            <Button onClick={handleSave} loading={isSaving}>Save User</Button>
-          </Group>
-        </Stack>
+            <Group justify="flex-end" mt="md">
+              <Button variant="subtle" onClick={() => setIsModalOpen(false)} color="gray">Cancel</Button>
+              <Button onClick={handleSave} loading={isSaving}>Save Changes</Button>
+            </Group>
+          </Stack>
+        ) : (
+          <>
+            <Stepper active={activeStep} onStepClick={setActiveStep} mb="xl">
+              <Stepper.Step label="Personal Info" description="Basic details">
+                <Stack gap="md" mt="md">
+                  <TextInput
+                    label="Name"
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+                    required
+                    data-autofocus
+                  />
+                  <TextInput
+                    label="Email"
+                    placeholder="john@coastaleats.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.currentTarget.value })}
+                    required
+                  />
+                </Stack>
+              </Stepper.Step>
+              <Stepper.Step label="Assignments" description="Role, Skills, Locations">
+                <Stack gap="md" mt="md">
+                  <Select
+                    label="Role"
+                    data={[
+                      { value: 'staff', label: 'Staff' },
+                      { value: 'manager', label: 'Manager' },
+                      { value: 'admin', label: 'Admin' },
+                    ]}
+                    value={formData.role}
+                    onChange={(val) => setFormData({ ...formData, role: (val || 'staff') as any })}
+                    required
+                  />
+                  <MultiSelect
+                    label="Certified Locations"
+                    data={locOptions}
+                    value={formData.certifiedLocations}
+                    onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
+                    required
+                    searchable
+                  />
+                  <MultiSelect
+                    label="Skills"
+                    data={skillOptions}
+                    value={formData.skills}
+                    onChange={(val) => setFormData({ ...formData, skills: val })}
+                    searchable
+                  />
+                </Stack>
+              </Stepper.Step>
+              <Stepper.Step label="Security" description="Password setup">
+                <Stack gap="md" mt="md">
+                  <PasswordInput
+                    label="Temporary Password"
+                    placeholder="Enter temporary password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.currentTarget.value })}
+                    required
+                  />
+                  <Stack gap={4}>
+                    {passwordReqs.map((req, idx) => (
+                      <Group key={idx} gap={8}>
+                        <Text c={req.valid ? 'teal' : 'red'} size="sm" style={{ width: 16 }}>
+                          {req.valid ? '✓' : '✗'}
+                        </Text>
+                        <Text size="xs" c={req.valid ? 'dimmed' : 'gray'}>{req.label}</Text>
+                      </Group>
+                    ))}
+                  </Stack>
+                </Stack>
+              </Stepper.Step>
+            </Stepper>
+
+            <Group justify="space-between" mt="xl">
+              <Button variant="default" onClick={prevStep} disabled={activeStep === 0}>Back</Button>
+              {activeStep < 2 ? (
+                <Button onClick={nextStep} disabled={
+                  (activeStep === 0 && (!formData.name || !formData.email)) ||
+                  (activeStep === 1 && (formData.certifiedLocations.length === 0))
+                }>Next step</Button>
+              ) : (
+                <Button onClick={handleSave} loading={isSaving} disabled={!isPasswordValid}>Save User</Button>
+              )}
+            </Group>
+          </>
+        )}
       </Modal>
     </Box>
   )

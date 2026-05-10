@@ -52,7 +52,7 @@ export async function getDb(): Promise<{
       role: u.role,
       avatarInitials: initials,
       avatarColor: stringToColor(u.id),
-      skills: (u.skills || u.Skills || []).map((s: any) => s.name || skillsMap.get(s.id) || 'staff'),
+      skills: (u.skills || u.Skills || []).map((s: any) => s.id || s),
       certifiedLocations: (u.certifiedLocations || u.Locations || []).map((l: any) => l.id),
       managedLocations: (u.managedLocations || []).map((l: any) => l.id),
 
@@ -73,17 +73,19 @@ export async function getDb(): Promise<{
     return {
       id: s.id,
       locationId: s.locationId,
+      startUtc: s.startUtc,
       date: startDt.toISODate(),
       startTime: startDt.toFormat('HH:mm'),
       endTime: endDt.toFormat('HH:mm'),
       isOvernight: endDt.day !== startDt.day,
-      requiredSkill: skillsMap.get(s.skillId) || 'staff',
+      requiredSkill: s.skillId || 'staff',
       headcount: s.headcount || 1,
       assignedStaff: (s.assignments || []).filter((a: any) => a.status === 'assigned').map((a: any) => a.userId),
       status: s.isPublished ? 'published' : 'draft',
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
-      isPremium: startDt.weekday >= 5 && startDt.hour >= 17
+      isPremium: startDt.weekday >= 5 && startDt.hour >= 17,
+      editCutoffHours: s.cutoffHours || 48
     };
   });
 

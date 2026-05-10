@@ -13,19 +13,34 @@ const SKILL_COLORS: Record<string, string> = {
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
 
-export function SettingsClient({ user }: { user: any }) {
-  const [prefs, setPrefs] = useState(user.notificationPrefs)
-  const [desiredHours, setDesiredHours] = useState<number | string>(user.desiredHoursPerWeek)
+export function SettingsClient({ user, allSkills }: { user: any; allSkills: { id: string, name: string }[] }) {
+  const [prefs, setPrefs] = useState({
+    inApp: user.notifyInApp ?? true,
+    emailSimulation: user.notifyEmail ?? false
+  })
+  const [desiredHours, setDesiredHours] = useState<number | string>(user.desiredHoursPerWeek || user.desiredHours || 40)
   const [saving, setSaving] = useState(false)
 
   async function save() {
     setSaving(true)
-    await fetch(`/api/staff/${user.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notificationPrefs: prefs, desiredHoursPerWeek: desiredHours }),
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notifyInApp: prefs.inApp,
+        notifyEmail: prefs.emailSimulation,
+        desiredHours: Number(desiredHours),
+        name: user.name,
+        email: user.email
+      }),
     })
+    
+    if (!res.ok) {
+      const d = await res.json()
+      notifications.show({ title: 'Error', message: d.message || 'Failed to update settings', color: 'red' })
+    } else {
+      notifications.show({ title: 'Settings saved', message: 'Your preferences have been updated.', color: 'green', autoClose: 3000 })
+    }
     setSaving(false)
-    notifications.show({ title: 'Settings saved', message: 'Your preferences have been updated.', color: 'green', autoClose: 3000 })
   }
 
   return (
@@ -50,7 +65,7 @@ export function SettingsClient({ user }: { user: any }) {
         <Group gap={16} grow>
           <Box>
             <Text size="xs" c="dimmed" fw={600} tt="uppercase" lts="0.05em" mb={4}>Hire Date</Text>
-            <Text size="sm">{user.hireDate}</Text>
+            <Text size="sm">{user.createdAt}</Text>
           </Box>
           <Box>
             <Text size="xs" c="dimmed" fw={600} tt="uppercase" lts="0.05em" mb={4}>Manager</Text>
@@ -59,12 +74,17 @@ export function SettingsClient({ user }: { user: any }) {
           <Box>
             <Text size="xs" c="dimmed" fw={600} tt="uppercase" lts="0.05em" mb={4}>Skills</Text>
             <Group gap={4} wrap="wrap">
-              {user.skills.map((s: string) => (
-                <Badge key={s} size="xs" variant="light"
-                  style={{ background: `${SKILL_COLORS[s]}22`, color: SKILL_COLORS[s], border: `1px solid ${SKILL_COLORS[s]}44` }}>
-                  {s.replace('_', ' ')}
-                </Badge>
-              ))}
+              {user.skills.map((sid: string) => {
+                const sObj = allSkills.find(s => s.id === sid)
+                const label = sObj?.name || sid
+                const slug = label.toLowerCase().replace(' ', '_')
+                return (
+                  <Badge key={sid} size="xs" variant="light"
+                    style={{ background: `${SKILL_COLORS[slug] ?? '#6366f1'}22`, color: SKILL_COLORS[slug] ?? '#6366f1', border: `1px solid ${SKILL_COLORS[slug] ?? '#6366f1'}44` }}>
+                    {label.replace('_', ' ')}
+                  </Badge>
+                )
+              })}
             </Group>
           </Box>
         </Group>
@@ -89,10 +109,12 @@ export function SettingsClient({ user }: { user: any }) {
         <Box>
           <Text size="sm" fw={500} c="gray.4" mb={12}>Notification Preferences</Text>
           <Stack gap={12}>
-            {[
-              { key: 'inApp', label: 'In-App Notifications', desc: 'Bell icon and toast messages' },
-              { key: 'emailSimulation', label: 'Email Notifications (Simulated)', desc: 'Logged to console in demo mode' },
-            ].map(({ key, label, desc }) => (
+            {(
+              [
+                { key: 'inApp', label: 'In-App Notifications', desc: 'Bell icon and toast messages' },
+                { key: 'emailSimulation', label: 'Email Notifications (Simulated)', desc: 'Logged to console in demo mode' },
+              ] as const
+            ).map(({ key, label, desc }) => (
               <Paper key={key} p="sm" radius="md" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
                 <Group justify="space-between" align="center">
                   <Box>

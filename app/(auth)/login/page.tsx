@@ -20,6 +20,9 @@ export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {} as any)
 
   useEffect(() => {
+    // Ensure invalid/expired session is cleared on the client
+    document.cookie = 'shiftsync_session=; Max-Age=0; path=/;';
+    
     if (state?.success) {
       window.location.href = '/dashboard'
     }
@@ -70,6 +73,7 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 defaultValue=""
+                suppressHydrationWarning
               />
               <PasswordInput
                 name="password"
@@ -77,6 +81,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
+                suppressHydrationWarning
               />
 
               {state?.error && (
@@ -101,10 +106,9 @@ export default function LoginPage() {
           </Text>
           <Stack gap={6}>
             {[
-              { role: 'Admin', email: 'admin@coastaleats.com', pass: 'admin123', color: '#f59e0b' },
-              { role: 'Manager (LA)', email: 'sarah.mgr@coastaleats.com', pass: 'manager123', color: '#6366f1' },
-              { role: 'Manager (Miami)', email: 'carlos.mgr@coastaleats.com', pass: 'manager123', color: '#06b6d4' },
-              { role: 'Staff', email: 'alex@coastaleats.com', pass: 'staff123', color: '#ec4899' },
+              { role: 'Admin', email: 'admin@coastaleats.com', pass: 'password123', color: '#f59e0b' },
+              { role: 'Downtown Manager', email: 'manager1@coastaleats.com', pass: 'password123', color: '#6366f1' },
+              { role: 'Staff', email: 'john@coastaleats.com', pass: 'password123', color: '#ec4899' },
             ].map(c => (
               <Box key={c.email} p="sm" style={{ background: 'var(--bg-card)', borderRadius: 8 }}>
                 <Group justify="space-between" align="center">

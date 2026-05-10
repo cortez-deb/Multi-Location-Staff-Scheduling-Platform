@@ -41,6 +41,23 @@ export default (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    reportsToId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      defaultValue: null,
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    hireDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
   }, {
     sequelize,
     modelName: 'User',
