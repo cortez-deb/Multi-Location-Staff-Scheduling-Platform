@@ -17,10 +17,12 @@ export async function createShift(req, res, next) {
     }
 
     const shift = await Shift.create({ locationId, skillId, startUtc, endUtc, headcount });
+    console.log(shift);
     await logAudit(req.user.userId, 'Shift', shift.id, 'SHIFT_CREATED', null, shift.toJSON());
     
     res.status(201).json(shift);
   } catch (err) {
+    console.error(err); 
     next(err);
   }
 }
@@ -195,25 +197,16 @@ export async function createAssignment(req, res, next) {
     }
 
     try {
-      const violations = await checkConstraints(userId, shiftId);
+      const result = await checkConstraints(userId, shiftId, overrideReason);
       
-      const hardBlocks = violations.filter(v => 
-        ['DOUBLE_BOOKING', 'TEN_HOUR_GAP', 'SKILL_MISMATCH', 'LOCATION_NOT_CERTIFIED', 'AVAILABILITY_VIOLATION', 'EXCESSIVE_DAY'].includes(v.rule)
-      );
-
-      if (hardBlocks.length > 0) {
+      if (!result.allowed) {
         return res.status(422).json({
-          error: 'CONSTRAINT_VIOLATION',
-          ...hardBlocks[0] // Returns rule, message, suggestions
-        });
-      }
-
-      const seventhDayBlock = violations.find(v => v.rule === 'SEVENTH_DAY');
-      if (seventhDayBlock && !overrideReason) {
-        return res.status(422).json({
-          error: 'OVERRIDE_REQUIRED',
-          rule: 'SEVENTH_DAY',
-          message: seventhDayBlock.message
+          error: 'constraint_violation',
+          message: 'Assignment blocked by scheduling constraints.',
+          violations: result.violations,
+          warnings: result.warnings,
+          requiresOverride: result.requiresOverride,
+          overrideTarget: result.overrideTarget
         });
       }
 
@@ -232,7 +225,10 @@ export async function createAssignment(req, res, next) {
         userId
       });
 
-      return res.status(201).json(assignment);
+      return res.status(201).json({
+        assignment,
+        warnings: result.warnings
+      });
     } finally {
       // Release lock
       await redisClient.del(lockKey);
@@ -274,14 +270,18 @@ export async function getEligibleStaff(req, res, next) {
 
     const eligible = [];
     for (const uid of candidateIds) {
-      const violations = await checkConstraints(uid, shiftId);
-      // If no hard blocks, they are eligible (we can include those needing override)
-      const hardBlocks = violations.filter(v => 
-        ['DOUBLE_BOOKING', 'TEN_HOUR_GAP', 'SKILL_MISMATCH', 'LOCATION_NOT_CERTIFIED', 'AVAILABILITY_VIOLATION', 'EXCESSIVE_DAY'].includes(v.rule)
-      );
-      if (hardBlocks.length === 0) {
+      const result = await checkConstraints(uid, shiftId);
+      
+      const hasNonOverridableHardBlocks = result.violations.some(v => v.code !== 'DAILY_HOURS_BLOCK' && v.code !== 'CONSECUTIVE_DAY_BLOCK');
+      
+      if (!hasNonOverridableHardBlocks) {
         const user = await User.findByPk(uid, { attributes: { exclude: ['passwordHash'] } });
-        eligible.push({ ...user.toJSON(), warnings: violations });
+        eligible.push({ 
+          ...user.toJSON(), 
+          warnings: result.warnings, 
+          violations: result.violations,
+          requiresOverride: result.requiresOverride 
+        });
       }
     }
 

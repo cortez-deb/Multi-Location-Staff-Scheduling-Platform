@@ -31,23 +31,35 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
 
   async function assign(staffId: string, override?: string) {
     setLoading(true); setViolations([]); setWarnings([]); setMsg('')
-    const res = await fetch(`/api/shifts/${shift.id}/assign`, {
+    const res = await fetch(`/api/shifts/${shift.id}/assignments`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staffId, action: 'assign', overrideReason: override }),
+      body: JSON.stringify({ userId: staffId, overrideReason: override }),
     })
     const d = await res.json()
     setLoading(false)
-    if (d.success) { router.refresh(); setPendingAssign(null) }
-    else if (d.requiresOverride) { setPendingAssign(staffId); setViolations(d.violations ?? []) }
-    else if (d.violations) { setViolations(d.violations.filter((v: any) => v.severity === 'error')); setWarnings(d.violations.filter((v: any) => v.severity === 'warning')) }
-    else setMsg(d.error)
+    
+    // If successful (HTTP 201), the response is { assignment, warnings }
+    if (res.ok) { 
+      router.refresh(); 
+      setPendingAssign(null);
+      if (d.warnings && d.warnings.length > 0) {
+        setWarnings(d.warnings);
+      }
+    } else if (res.status === 422) {
+      if (d.requiresOverride) {
+        setPendingAssign(staffId);
+      }
+      setViolations(d.violations ?? []);
+      setWarnings(d.warnings ?? []);
+    } else {
+      setMsg(d.message || d.error || 'Failed to assign');
+    }
   }
 
   async function unassign(staffId: string) {
     setLoading(true)
-    await fetch(`/api/shifts/${shift.id}/assign`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staffId, action: 'unassign' }),
+    await fetch(`/api/shifts/${shift.id}/assignments/${staffId}`, {
+      method: 'DELETE'
     })
     setLoading(false); router.refresh()
   }
@@ -103,7 +115,7 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
           </div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Edit Cutoff</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{shift.editCutoffHours}h before shift</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{shift.editCutoffHours ? `${shift.editCutoffHours}h before shift` : 'Not set'}</div>
           </div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Created By</div>

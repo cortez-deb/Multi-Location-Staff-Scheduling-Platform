@@ -6,7 +6,15 @@ import {
 import { shiftWithinAvailability, toLocal, extractLocalDayAndTime } from '../utils/timezone.js';
 import { getDailyHours, getConsecutiveDays, getWeeklyHours } from './labor.service.js';
 
-export async function checkConstraints(userId, shiftId) {
+export async function checkConstraints(userId, shiftId, overrideReason = null) {
+  const result = {
+    allowed: true,
+    violations: [],
+    warnings: [],
+    requiresOverride: false,
+    overrideTarget: null
+  };
+
   const shift = await Shift.findByPk(shiftId, {
     include: [
       { model: Location, as: 'location' },
@@ -14,204 +22,270 @@ export async function checkConstraints(userId, shiftId) {
     ]
   });
 
-  if (!shift) throw new Error('Shift not found');
+  if (!shift) {
+    result.allowed = false;
+    result.violations.push({ level: 'HARD', code: 'SHIFT_NOT_FOUND', message: 'Shift not found' });
+    return result;
+  }
+
+  // Pre-check: Headcount
+  const existingAssignments = await ShiftAssignment.count({
+    where: { shiftId: shift.id, status: 'assigned' }
+  });
+  if (existingAssignments >= shift.headcount) {
+    result.allowed = false;
+    result.violations.push({ 
+      level: 'HARD', 
+      code: 'SHIFT_FULL', 
+      message: `This shift already has ${existingAssignments}/${shift.headcount} staff assigned.` 
+    });
+    return result;
+  }
 
   const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
+  if (!user) {
+    result.allowed = false;
+    result.violations.push({ level: 'HARD', code: 'USER_NOT_FOUND', message: 'User not found' });
+    return result;
+  }
 
-  const violations = [];
   const startUtc = shift.startUtc;
   const endUtc = shift.endUtc;
   const tz = shift.location.timezone;
   const localStart = toLocal(startUtc.toISOString(), tz);
   const localDate = localStart.toFormat('yyyy-MM-dd');
 
-  // 1. Double-booking
-  const overlappingAssignments = await ShiftAssignment.findAll({
-    where: { userId, status: 'assigned' },
-    include: [{
-      model: Shift,
-      as: 'shift',
-      where: {
-        [Op.or]: [
-          { startUtc: { [Op.lt]: endUtc, [Op.gte]: startUtc } },
-          { endUtc: { [Op.gt]: startUtc, [Op.lte]: endUtc } },
-          { startUtc: { [Op.lte]: startUtc }, endUtc: { [Op.gte]: endUtc } }
-        ]
-      }
-    }]
-  });
-
-  if (overlappingAssignments.length > 0) {
-    const conflict = overlappingAssignments[0].shift;
-    violations.push({
-      rule: 'DOUBLE_BOOKING',
-      message: `${user.name} is already assigned to a shift overlapping with this time.`,
-    });
-  }
-
-  // 2. 10-hour gap
-  const tenHoursMs = 10 * 60 * 60 * 1000;
-  const allAssignments = await ShiftAssignment.findAll({
-    where: { userId, status: 'assigned' },
-    include: [{ model: Shift, as: 'shift' }]
-  });
-
-  for (const assignment of allAssignments) {
-    const otherShift = assignment.shift;
-    // skip the overlapping ones as they are covered by double booking
-    if (otherShift.endUtc <= startUtc) {
-      const gapMs = startUtc.getTime() - otherShift.endUtc.getTime();
-      if (gapMs < tenHoursMs && gapMs >= 0) {
-        violations.push({
-          rule: 'TEN_HOUR_GAP',
-          message: `Less than 10 hours gap from a previous shift (${Math.floor(gapMs / 60000)} mins gap).`,
-        });
-      }
-    } else if (otherShift.startUtc >= endUtc) {
-      const gapMs = otherShift.startUtc.getTime() - endUtc.getTime();
-      if (gapMs < tenHoursMs && gapMs >= 0) {
-        violations.push({
-          rule: 'TEN_HOUR_GAP',
-          message: `Less than 10 hours gap to the next shift (${Math.floor(gapMs / 60000)} mins gap).`,
-        });
+  // Helper for generating suggestions
+  const getSuggestions = async () => {
+    const certifiedUserIds = (await UserLocation.findAll({ where: { locationId: shift.locationId } })).map(ul => ul.userId);
+    const skilledUserIds = (await UserSkill.findAll({ where: { skillId: shift.skillId } })).map(us => us.userId);
+    let potentialUserIds = certifiedUserIds.filter(id => skilledUserIds.includes(id) && id !== userId);
+    
+    const validSuggestions = [];
+    for (const uid of potentialUserIds) {
+      const v = await checkConstraintsInternal(uid, shift, startUtc, endUtc, tz, localStart, localDate);
+      if (v.length === 0) {
+        const weekStartDt = localStart.startOf('week');
+        const weeklyHours = await getWeeklyHours(uid, weekStartDt.toUTC().toISODate());
+        const pUser = await User.findByPk(uid);
+        validSuggestions.push({ userId: uid, name: pUser.name, reason: "Matches skill, location, and availability.", weeklyHours });
       }
     }
-  }
+    validSuggestions.sort((a, b) => a.weeklyHours - b.weeklyHours);
+    return validSuggestions.slice(0, 5).map(s => ({ userId: s.userId, name: s.name, reason: s.reason }));
+  };
 
-  // 3. Skill match
+  // CHECK 1 — SKILL MATCH [HARD]
   const userSkill = await UserSkill.findOne({ where: { userId, skillId: shift.skillId } });
   if (!userSkill) {
-    violations.push({
-      rule: 'SKILL_MISMATCH',
-      message: `${user.name} does not have the required skill: ${shift.skill.name}.`,
+    result.allowed = false;
+    result.violations.push({
+      level: 'HARD',
+      code: 'SKILL_MISMATCH',
+      message: `${user.name} does not have the required skill for this shift.`,
+      suggestions: await getSuggestions()
     });
   }
 
-  // 4. Location certification
+  // CHECK 2 — LOCATION CERTIFICATION [HARD]
   const userLocation = await UserLocation.findOne({ where: { userId, locationId: shift.locationId } });
   if (!userLocation) {
-    violations.push({
-      rule: 'LOCATION_NOT_CERTIFIED',
+    result.allowed = false;
+    result.violations.push({
+      level: 'HARD',
+      code: 'NOT_CERTIFIED',
       message: `${user.name} is not certified to work at ${shift.location.name}.`,
+      suggestions: await getSuggestions()
     });
   }
 
-  // 5. Availability
-  const exception = await AvailabilityException.findOne({
-    where: { userId, date: localDate }
-  });
-
+  // CHECK 3 — AVAILABILITY WINDOW [HARD]
+  const exception = await AvailabilityException.findOne({ where: { userId, date: localDate } });
   let isAvailable = true;
   if (exception) {
-    if (!exception.available) {
-      isAvailable = false;
-    } else if (exception.startTime && exception.endTime) {
+    if (!exception.available) isAvailable = false;
+    else if (exception.startTime && exception.endTime) {
       isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), exception.startTime, exception.endTime, tz);
     }
   } else {
     const { dayOfWeek } = extractLocalDayAndTime(localStart);
     const recurring = await Availability.findOne({ where: { userId, dayOfWeek } });
-    if (recurring) {
+    if (!recurring) {
+      isAvailable = false;
+    } else {
       isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), recurring.startTime, recurring.endTime, tz);
     }
   }
-
+  
   if (!isAvailable) {
-    violations.push({
-      rule: 'AVAILABILITY_VIOLATION',
-      message: `Shift falls outside of ${user.name}'s availability.`,
+    result.allowed = false;
+    result.violations.push({
+      level: 'HARD',
+      code: 'UNAVAILABLE',
+      message: `${user.name} is not available during this shift time.`,
+      suggestions: await getSuggestions()
     });
   }
 
-  // 6. Daily cap
-  const shiftHours = (endUtc.getTime() - startUtc.getTime()) / (1000 * 60 * 60);
-  const currentDailyHours = await getDailyHours(userId, localDate, tz);
-  if (currentDailyHours + shiftHours > 12) {
-    violations.push({
-      rule: 'EXCESSIVE_DAY',
-      message: `Adding this shift would exceed the 12-hour daily maximum (${currentDailyHours + shiftHours} hours).`,
-    });
-  }
-
-  // Add suggestions if there are violations
-  if (violations.length > 0) {
-    // Collect all certified staff for this location with this skill
-    const eligibleStaffIds = await UserLocation.findAll({
-      where: { locationId: shift.locationId },
-      include: [{
-        model: User,
-        as: 'User', // default alias generated by belongsTo if not overridden... Wait, the alias was defined in models/index.js?
-      }]
-    });
-
-    // Instead of doing complex subqueries, since the number of staff is small, we'll fetch potentials and filter
-    const certifiedUserIds = (await UserLocation.findAll({ where: { locationId: shift.locationId } })).map(ul => ul.userId);
-    const skilledUserIds = (await UserSkill.findAll({ where: { skillId: shift.skillId } })).map(us => us.userId);
-    
-    // Intersection
-    let potentialUserIds = certifiedUserIds.filter(id => skilledUserIds.includes(id) && id !== userId);
-
-    const validSuggestions = [];
-    
-    for (const uid of potentialUserIds) {
-      // Fast checks using existing checkConstraints without suggestions recursively
-      const v = await checkConstraintsWithoutSuggestions(uid, shiftId);
-      if (v.length === 0) {
-        // Find weekly hours to sort them
-        const weekStartDt = localStart.startOf('week');
-        const weeklyHours = await getWeeklyHours(uid, weekStartDt.toUTC().toISODate());
-        const pUser = await User.findByPk(uid);
-        validSuggestions.push({
-          userId: uid,
-          name: pUser.name,
-          weeklyHours
-        });
-      }
-    }
-
-    validSuggestions.sort((a, b) => a.weeklyHours - b.weeklyHours);
-    violations[0].suggestions = validSuggestions.slice(0, 3);
-  }
-
-  return violations;
-}
-
-// Internal version that doesn't compute suggestions to avoid infinite loops
-async function checkConstraintsWithoutSuggestions(userId, shiftId) {
-  const shift = await Shift.findByPk(shiftId, { include: [{ model: Location, as: 'location' }] });
-  const startUtc = shift.startUtc;
-  const endUtc = shift.endUtc;
-  const tz = shift.location.timezone;
-  const localStart = toLocal(startUtc.toISOString(), tz);
-  const localDate = localStart.toFormat('yyyy-MM-dd');
-  const violations = [];
-
-  const overlappingAssignments = await ShiftAssignment.findAll({
-    where: { userId, status: 'assigned' },
-    include: [{
-      model: Shift,
-      as: 'shift',
-      where: {
-        [Op.or]: [
-          { startUtc: { [Op.lt]: endUtc, [Op.gte]: startUtc } },
-          { endUtc: { [Op.gt]: startUtc, [Op.lte]: endUtc } },
-          { startUtc: { [Op.lte]: startUtc }, endUtc: { [Op.gte]: endUtc } }
-        ]
-      }
-    }]
-  });
-  if (overlappingAssignments.length > 0) violations.push({});
-
+  // Active assignments for checking 4, 5, 6, 7, 8
   const allAssignments = await ShiftAssignment.findAll({
     where: { userId, status: 'assigned' },
     include: [{ model: Shift, as: 'shift' }]
   });
+
+  // CHECK 4 — NO DOUBLE-BOOKING [HARD]
+  let doubleBooked = false;
+  for (const a of allAssignments) {
+    const existing = a.shift;
+    if (existing.startUtc < endUtc && existing.endUtc > startUtc) {
+      doubleBooked = true;
+      const conflictLoc = await Location.findByPk(existing.locationId);
+      result.allowed = false;
+      result.violations.push({
+        level: 'HARD',
+        code: 'DOUBLE_BOOKED',
+        message: `${user.name} is already assigned to an overlapping shift at ${conflictLoc ? conflictLoc.name : 'another location'} on ${localDate}.`
+      });
+      break;
+    }
+  }
+
+  // CHECK 5 — MINIMUM REST GAP (10 HOURS) [HARD]
   const tenHoursMs = 10 * 60 * 60 * 1000;
-  for (const assignment of allAssignments) {
-    const otherShift = assignment.shift;
-    if (otherShift.endUtc <= startUtc && (startUtc.getTime() - otherShift.endUtc.getTime()) < tenHoursMs) violations.push({});
-    if (otherShift.startUtc >= endUtc && (otherShift.startUtc.getTime() - endUtc.getTime()) < tenHoursMs) violations.push({});
+  for (const a of allAssignments) {
+    const existing = a.shift;
+    if (existing.endUtc <= startUtc) {
+      const gap = startUtc.getTime() - existing.endUtc.getTime();
+      if (gap < tenHoursMs) {
+        result.allowed = false;
+        result.violations.push({
+          level: 'HARD',
+          code: 'REST_VIOLATION',
+          message: `Only ${(gap / (1000 * 60 * 60)).toFixed(1)}h rest between shifts. Minimum is 10 hours.`
+        });
+      }
+    } else if (existing.startUtc >= endUtc) {
+      const gap = existing.startUtc.getTime() - endUtc.getTime();
+      if (gap < tenHoursMs) {
+        result.allowed = false;
+        result.violations.push({
+          level: 'HARD',
+          code: 'REST_VIOLATION',
+          message: `Only ${(gap / (1000 * 60 * 60)).toFixed(1)}h rest between shifts. Minimum is 10 hours.`
+        });
+      }
+    }
+  }
+
+  // CHECK 6 — DAILY HOUR LIMIT [HARD >12h / WARN >8h]
+  const shiftHours = (endUtc.getTime() - startUtc.getTime()) / (1000 * 60 * 60);
+  let currentDailyHours = 0;
+  for (const a of allAssignments) {
+    const sLocal = toLocal(a.shift.startUtc.toISOString(), tz);
+    if (sLocal.toFormat('yyyy-MM-dd') === localDate) {
+      currentDailyHours += (a.shift.endUtc.getTime() - a.shift.startUtc.getTime()) / (1000 * 60 * 60);
+    }
+  }
+  const projectedDaily = currentDailyHours + shiftHours;
+
+  if (projectedDaily > 12) {
+    if (overrideReason) {
+      result.warnings.push({
+        level: 'WARN',
+        code: 'DAILY_HOURS_BLOCK',
+        message: `Daily 12h limit exceeded (${projectedDaily.toFixed(1)}h) — approved with override: '${overrideReason}'.`
+      });
+    } else {
+      result.allowed = false;
+      result.requiresOverride = true;
+      if (!result.overrideTarget) result.overrideTarget = "DAILY_HOURS_BLOCK";
+      result.violations.push({
+        level: 'HARD',
+        code: 'DAILY_HOURS_BLOCK',
+        message: `Assigning this shift would result in ${projectedDaily.toFixed(1)}h in one day (maximum is 12h). A documented reason is required to proceed.`
+      });
+    }
+  } else if (projectedDaily > 8) {
+    result.warnings.push({
+      level: 'WARN',
+      code: 'DAILY_HOURS_WARN',
+      message: `This assignment results in ${projectedDaily.toFixed(1)}h worked in one day (over 8h).`
+    });
+  }
+
+  // CHECK 7 — WEEKLY HOURS APPROACHING OVERTIME [WARN]
+  const weekStartDt = localStart.startOf('week');
+  const weekStartISO = weekStartDt.toUTC().toISODate();
+  const currentWeeklyHours = await getWeeklyHours(userId, weekStartISO);
+  const projectedWeekly = currentWeeklyHours + shiftHours;
+
+  if (projectedWeekly >= 40) {
+    result.warnings.push({
+      level: 'WARN',
+      code: 'WEEKLY_HOURS_WARN',
+      message: `${user.name} would reach ${projectedWeekly.toFixed(1)}h this week, exceeding the 40h overtime threshold.`
+    });
+  } else if (projectedWeekly >= 35) {
+    result.warnings.push({
+      level: 'WARN',
+      code: 'WEEKLY_HOURS_WARN',
+      message: `${user.name} is projected at ${projectedWeekly.toFixed(1)}h this week, approaching the 40h overtime threshold.`
+    });
+  }
+
+  // CHECK 8 — CONSECUTIVE DAYS WORKED [HARD 7th / WARN 6th]
+  const consecutiveDays = await getConsecutiveDays(userId, localStart.minus({ days: 1 }).toFormat('yyyy-MM-dd'), tz);
+  const projectedConsecutive = consecutiveDays + 1;
+
+  if (projectedConsecutive >= 7) {
+    if (overrideReason) {
+      result.warnings.push({
+        level: 'WARN',
+        code: 'CONSECUTIVE_DAY_BLOCK',
+        message: `7th consecutive day approved with override: '${overrideReason}'.`
+      });
+    } else {
+      result.allowed = false;
+      result.requiresOverride = true;
+      if (!result.overrideTarget) result.overrideTarget = "CONSECUTIVE_DAY_BLOCK";
+      result.violations.push({
+        level: 'HARD',
+        code: 'CONSECUTIVE_DAY_BLOCK',
+        message: `This would be ${user.name}'s 7th consecutive day. A documented reason is required to proceed.`
+      });
+    }
+  } else if (projectedConsecutive === 6) {
+    result.warnings.push({
+      level: 'WARN',
+      code: 'CONSECUTIVE_DAY_WARN',
+      message: `This would be ${user.name}'s 6th consecutive day. Consider scheduling a rest day.`
+    });
+  }
+
+  return result;
+}
+
+// Helper to quickly find if a user has any hard blocks without recursive queries
+async function checkConstraintsInternal(userId, shift, startUtc, endUtc, tz, localStart, localDate) {
+  const v = [];
+  const allAssignments = await ShiftAssignment.findAll({
+    where: { userId, status: 'assigned' },
+    include: [{ model: Shift, as: 'shift' }]
+  });
+
+  for (const a of allAssignments) {
+    const existing = a.shift;
+    if (existing.startUtc < endUtc && existing.endUtc > startUtc) {
+      v.push('DOUBLE_BOOKED');
+      break;
+    }
+  }
+
+  const tenHoursMs = 10 * 60 * 60 * 1000;
+  for (const a of allAssignments) {
+    const existing = a.shift;
+    if (existing.endUtc <= startUtc && (startUtc.getTime() - existing.endUtc.getTime()) < tenHoursMs) v.push('REST_VIOLATION');
+    if (existing.startUtc >= endUtc && (existing.startUtc.getTime() - endUtc.getTime()) < tenHoursMs) v.push('REST_VIOLATION');
   }
 
   const exception = await AvailabilityException.findOne({ where: { userId, date: localDate } });
@@ -222,18 +296,23 @@ async function checkConstraintsWithoutSuggestions(userId, shiftId) {
   } else {
     const { dayOfWeek } = extractLocalDayAndTime(localStart);
     const recurring = await Availability.findOne({ where: { userId, dayOfWeek } });
-    if (recurring) {
-      isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), recurring.startTime, recurring.endTime, tz);
+    if (!recurring) isAvailable = false;
+    else isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), recurring.startTime, recurring.endTime, tz);
+  }
+  if (!isAvailable) v.push('UNAVAILABLE');
+
+  let currentDailyHours = 0;
+  for (const a of allAssignments) {
+    const sLocal = toLocal(a.shift.startUtc.toISOString(), tz);
+    if (sLocal.toFormat('yyyy-MM-dd') === localDate) {
+      currentDailyHours += (a.shift.endUtc.getTime() - a.shift.startUtc.getTime()) / (1000 * 60 * 60);
     }
   }
-  if (!isAvailable) violations.push({});
-
   const shiftHours = (endUtc.getTime() - startUtc.getTime()) / (1000 * 60 * 60);
-  const currentDailyHours = await getDailyHours(userId, localDate, tz);
-  if (currentDailyHours + shiftHours > 12) violations.push({});
+  if (currentDailyHours + shiftHours > 12) v.push('DAILY_HOURS_BLOCK');
 
   const consecutiveDays = await getConsecutiveDays(userId, localStart.minus({ days: 1 }).toFormat('yyyy-MM-dd'), tz);
-  if (consecutiveDays + 1 >= 7) violations.push({});
+  if (consecutiveDays + 1 >= 7) v.push('CONSECUTIVE_DAY_BLOCK');
 
-  return violations;
+  return v;
 }

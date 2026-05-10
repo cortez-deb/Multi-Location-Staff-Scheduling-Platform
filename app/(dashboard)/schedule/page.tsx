@@ -55,6 +55,7 @@ export default async function SchedulePage({
       locations={locations}
       selectedLocation={locationFilter}
       today={today}
+      skills={db.skills}
     />
   )
 }

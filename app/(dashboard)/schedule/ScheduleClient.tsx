@@ -5,6 +5,7 @@ import {
   Box, Group, Stack, Text, Title, Badge, Avatar, Button, Modal,
   Select, Textarea, NumberInput, TextInput, Paper, Divider,
 } from '@mantine/core'
+import { getShiftUTCTimes } from '@/lib/timezone'
 import type { Session, Location, Shift } from '@/lib/types'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -25,9 +26,10 @@ type Props = {
   locations: Location[]
   selectedLocation: string | null
   today: string
+  skills: { id: string, name: string }[]
 }
 
-export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap, locations, selectedLocation, today }: Props) {
+export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap, locations, selectedLocation, today, skills }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
@@ -244,6 +246,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
           onSaved={() => { setShowCreate(false); setEditShiftData(null); router.refresh() }}
           defaultDate={today}
           initialShift={editShiftData}
+          skills={skills}
         />
       )}
     </Box>
@@ -409,8 +412,8 @@ function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdat
   )
 }
 
-function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, initialShift }: {
-  opened: boolean; locations: Location[]; onClose: () => void; onSaved: () => void; defaultDate: string; initialShift?: Partial<Shift> | null
+function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, initialShift, skills }: {
+  opened: boolean; locations: Location[]; onClose: () => void; onSaved: () => void; defaultDate: string; initialShift?: Partial<Shift> | null; skills: { id: string, name: string }[]
 }) {
   const [form, setForm] = useState({
     locationId: initialShift?.locationId || (locations[0]?.id ?? ''),
@@ -433,10 +436,30 @@ function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, init
     const isEdit = !!initialShift?.id
     const url = isEdit ? `/api/shifts/${initialShift.id}` : '/api/shifts'
     const method = isEdit ? 'PUT' : 'POST'
+
+    // Map string requiredSkill to UUID skillId
+    const skillObj = skills.find(s => s.name === form.requiredSkill) || skills.find(s => s.name.toLowerCase() === form.requiredSkill.toLowerCase())
+    const skillId = skillObj?.id
+
+    // Get location timezone
+    const loc = locations.find(l => l.id === form.locationId)
+    const tz = loc?.timezone || 'UTC'
+
+    // Convert local time to UTC
+    const { start, end } = getShiftUTCTimes(form.date, form.startTime, form.endTime, tz)
+
+    const payload = {
+      locationId: form.locationId,
+      skillId,
+      startUtc: start.toISOString(),
+      endUtc: end.toISOString(),
+      headcount: form.headcount,
+      notes: form.notes
+    }
     
     const res = await fetch(url, {
       method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     })
     const d = await res.json()
     setLoading(false)

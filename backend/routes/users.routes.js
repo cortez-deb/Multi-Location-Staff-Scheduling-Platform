@@ -8,7 +8,7 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', requireRole('admin'), usersController.getAllUsers);
+router.get('/', usersController.getAllUsers);
 
 router.get('/:id', requireSelfOrAdmin(), usersController.getUser);
 

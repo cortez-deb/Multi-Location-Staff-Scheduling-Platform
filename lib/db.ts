@@ -19,6 +19,7 @@ export async function getDb(): Promise<{
   shifts: Shift[];
   swapRequests: SwapRequest[];
   notifications: AppNotification[];
+  skills: { id: string, name: string }[];
   recurringAvailability: RecurringAvailability[];
   availabilityExceptions: AvailabilityException[];
 }> {
@@ -51,9 +52,10 @@ export async function getDb(): Promise<{
       role: u.role,
       avatarInitials: initials,
       avatarColor: stringToColor(u.id),
-      skills: (u.Skills || []).map((s: any) => s.name || skillsMap.get(s.id) || 'staff'),
-      certifiedLocations: (u.Locations || []).map((l: any) => l.id),
-      managedLocations: (u.managedLocations || []).map((l: any) => l.id), // Ensure backend returns this, or map it
+      skills: (u.skills || u.Skills || []).map((s: any) => s.name || skillsMap.get(s.id) || 'staff'),
+      certifiedLocations: (u.certifiedLocations || u.Locations || []).map((l: any) => l.id),
+      managedLocations: (u.managedLocations || []).map((l: any) => l.id),
+
       desiredHoursPerWeek: u.desiredHours || 40,
       maxHoursPerWeek: 40,
       isActive: true,
@@ -103,6 +105,7 @@ export async function getDb(): Promise<{
     shifts,
     swapRequests,
     notifications,
+    skills: skillsRes,
     recurringAvailability: [],
     availabilityExceptions: []
   };

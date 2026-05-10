@@ -8,9 +8,40 @@ import { getIO } from '../sockets/index.js';
 
 export async function getAllUsers(req, res, next) {
   try {
-    const users = await User.findAll({
-      attributes: { exclude: ['passwordHash'] }
+    const includeConfig = [
+      { model: Location, as: 'certifiedLocations' },
+      { model: Location, as: 'managedLocations' },
+      { model: Skill, as: 'skills' }
+    ];
+
+    let users = await User.findAll({
+      attributes: { exclude: ['passwordHash'] },
+      include: includeConfig
     });
+
+    if (req.user.role === 'admin') {
+      // Admin sees everyone, no filtering needed
+    } else if (req.user.role === 'manager') {
+      const managerLocs = await ManagerLocation.findAll({ where: { userId: req.user.userId } });
+      const managerLocIds = managerLocs.map(ml => ml.locationId);
+
+      users = users.filter(u => {
+        if (u.id === req.user.userId) return true;
+        const certLocIds = u.certifiedLocations.map(cl => cl.id);
+        return certLocIds.some(id => managerLocIds.includes(id));
+      });
+    } else {
+      // Staff
+      const staffLocs = await UserLocation.findAll({ where: { userId: req.user.userId } });
+      const staffLocIds = staffLocs.map(sl => sl.locationId);
+
+      users = users.filter(u => {
+        if (u.id === req.user.userId) return true;
+        const certLocIds = u.certifiedLocations.map(cl => cl.id);
+        return certLocIds.some(id => staffLocIds.includes(id));
+      });
+    }
+
     res.json(users);
   } catch (err) {
     next(err);
