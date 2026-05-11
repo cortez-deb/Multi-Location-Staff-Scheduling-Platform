@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Box, Group, Stack, Text, Title, Badge, Avatar, Button, Paper,
   NumberInput, Divider, Switch,
@@ -19,7 +19,30 @@ export function SettingsClient({ user, allSkills }: { user: any; allSkills: { id
     emailSimulation: user.notifyEmail ?? false
   })
   const [desiredHours, setDesiredHours] = useState<number | string>(user.desiredHoursPerWeek || user.desiredHours || 40)
+  const [sundayEnabled, setSundayEnabled] = useState(false)
+  const [sundayStart, setSundayStart] = useState('09:00')
+  const [sundayEnd, setSundayEnd] = useState('17:00')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    async function loadAvailability() {
+      try {
+        const res = await fetch(`/api/users/${user.id}/availability`)
+        if (res.ok) {
+          const data = await res.json()
+          const sun = (data.availabilities || []).find((a: any) => a.dayOfWeek === 0)
+          if (sun) {
+            setSundayEnabled(true)
+            setSundayStart(sun.startTime)
+            setSundayEnd(sun.endTime)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load availability', err)
+      }
+    }
+    loadAvailability()
+  }, [user.id])
 
   async function save() {
     setSaving(true)
@@ -32,6 +55,17 @@ export function SettingsClient({ user, allSkills }: { user: any; allSkills: { id
         name: user.name,
         email: user.email
       }),
+    })
+
+    // Also save Sunday availability
+    await fetch(`/api/users/${user.id}/availability/sunday`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        enabled: sundayEnabled, 
+        startTime: sundayStart, 
+        endTime: sundayEnd 
+      })
     })
     
     if (!res.ok) {
@@ -94,17 +128,65 @@ export function SettingsClient({ user, allSkills }: { user: any; allSkills: { id
       <Paper p="xl" radius="lg" mb={24} withBorder style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
         <Title order={2} size="h4" mb={20}>Preferences</Title>
 
-        <Box mb={20}>
-          <NumberInput
-            label="Desired Hours per Week"
-            description="Used for fairness analytics and scheduling recommendations"
-            min={1}
-            max={60}
-            value={desiredHours}
-            onChange={setDesiredHours}
-            style={{ maxWidth: 160 }}
-          />
-        </Box>
+        <Group align="flex-end" gap={32} mb={20} wrap="wrap">
+          <Box style={{ minWidth: 160 }}>
+            <NumberInput
+              label="Desired Hours per Week"
+              description="Target weekly load"
+              min={1}
+              max={60}
+              value={desiredHours}
+              onChange={setDesiredHours}
+            />
+          </Box>
+
+          <Box flex={1} style={{ minWidth: 280 }}>
+            <Paper p="sm" radius="md" withBorder style={{ background: 'rgba(255,255,255,0.01)', borderColor: 'rgba(255,255,255,0.05)' }}>
+              <Group justify="space-between" mb={sundayEnabled ? 10 : 0}>
+                <Box>
+                  <Text size="sm" fw={700}>Available on Sundays?</Text>
+                  <Text size="xs" c="dimmed">Sundays are optional</Text>
+                </Box>
+                <Switch 
+                  checked={sundayEnabled} 
+                  onChange={(e) => setSundayEnabled(e.currentTarget.checked)}
+                  color="indigo"
+                />
+              </Group>
+
+              {sundayEnabled && (
+                <Group grow gap={10}>
+                  <Box>
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>Start</Text>
+                    <input 
+                      type="time" 
+                      value={sundayStart} 
+                      onChange={e => setSundayStart(e.target.value)} 
+                      style={{ 
+                        width: '100%', padding: '6px', borderRadius: '4px', 
+                        background: 'var(--mantine-color-dark-6)', border: '1px solid var(--mantine-color-dark-4)',
+                        color: 'white', fontSize: '12px'
+                      }} 
+                    />
+                  </Box>
+                  <Box>
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>End</Text>
+                    <input 
+                      type="time" 
+                      value={sundayEnd} 
+                      onChange={e => setSundayEnd(e.target.value)} 
+                      style={{ 
+                        width: '100%', padding: '6px', borderRadius: '4px', 
+                        background: 'var(--mantine-color-dark-6)', border: '1px solid var(--mantine-color-dark-4)',
+                        color: 'white', fontSize: '12px'
+                      }} 
+                    />
+                  </Box>
+                </Group>
+              )}
+            </Paper>
+          </Box>
+        </Group>
 
         <Box>
           <Text size="sm" fw={500} c="gray.4" mb={12}>Notification Preferences</Text>
