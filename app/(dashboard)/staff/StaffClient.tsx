@@ -86,12 +86,23 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
   }
 
   const handleSave = async () => {
-    if (!formData.name || !formData.email || formData.certifiedLocations.length === 0) return
+    if (!formData.name || !formData.email || formData.certifiedLocations.length === 0) {
+      notifications.show({
+        title: 'Missing Required Fields',
+        message: 'Please provide a name, email, and at least one certified location.',
+        color: 'red',
+        radius: 'md',
+      })
+      return
+    }
+
     setIsSaving(true)
     try {
       let res;
       if (editingUser) {
-        res = await updateUser(editingUser.id, formData as any)
+        const updateData = { ...formData }
+        if (!updateData.password) delete (updateData as any).password
+        res = await updateUser(editingUser.id, updateData as any)
       } else {
         res = await addUser(formData as any)
       }
