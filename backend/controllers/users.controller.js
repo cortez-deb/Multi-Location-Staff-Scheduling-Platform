@@ -269,8 +269,13 @@ export async function addSkill(req, res, next) {
     const { skillId } = req.body;
     const userId = req.params.id;
 
-    await UserSkill.findOrCreate({
-      where: { userId, skillId }
+    const skill = await Skill.findByPk(skillId);
+    const io = getIO();
+    io.to(`user:${userId}`).emit('SKILL_ADDED', {
+      event: 'SKILL_ADDED',
+      title: 'New Skill Added',
+      message: `You have been certified for a new skill: ${skill?.name || 'Unknown'}.`,
+      data: { skillId, skillName: skill?.name }
     });
 
     res.status(201).json({ message: 'Skill added' });
@@ -309,6 +314,15 @@ export async function addLocation(req, res, next) {
 
     await UserLocation.findOrCreate({
       where: { userId, locationId }
+    });
+
+    const location = await Location.findByPk(locationId);
+    const io = getIO();
+    io.to(`user:${userId}`).emit('LOCATION_CERTIFIED', {
+      event: 'LOCATION_CERTIFIED',
+      title: 'Location Certified',
+      message: `You are now certified to work at ${location?.name || 'a new location'}.`,
+      data: { locationId, locationName: location?.name }
     });
 
     await logAudit(req.user.userId, 'UserLocation', userId, 'CERTIFY_LOCATION', null, { locationId });
@@ -386,6 +400,18 @@ export async function assignManager(req, res, next) {
     const { managerId } = req.body;
     const staffId = req.params.id;
     const user = await reportingService.assignManager(staffId, managerId, req.user.userId);
+    
+    const manager = await User.findByPk(managerId);
+    const io = getIO();
+    io.to(`user:${staffId}`).emit('MANAGER_ASSIGNED', {
+      event: 'MANAGER_ASSIGNED',
+      title: 'New Manager Assigned',
+      message: `You now report to ${manager?.name || 'a new manager'}.`,
+      data: { managerId, managerName: manager?.name }
+    });
+    
+    await notify(staffId, 'MANAGER_ASSIGNED', `You have been assigned to manager ${manager?.name || 'Unknown'}.`, { managerId }, io);
+
     res.json(user);
   } catch (err) {
     if (err.status) {
@@ -442,3 +468,17 @@ export async function getDirectReports(req, res, next) {
   }
 }
 
+export async function deleteUser(req, res, next) {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+
+    user.isActive = false;
+    await user.save();
+
+    await logAudit(req.user.userId, 'User', user.id, 'USER_ARCHIVED', { isActive: true }, { isActive: false });
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}

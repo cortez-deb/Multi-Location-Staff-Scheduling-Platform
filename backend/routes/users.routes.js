@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireRole, requireSelfOrAdmin } from '../middleware/auth.js';
 import * as usersController from '../controllers/users.controller.js';
+import * as leaveController from '../controllers/leave.controller.js';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.patch('/:id/manager', [
 router.get('/:id/manager', requireSelfOrAdmin(), usersController.getManager);
 router.get('/:id/manager/history', requireRole('admin'), usersController.getReportingHistory);
 router.get('/:id/direct-reports', requireSelfOrAdmin(), usersController.getDirectReports);
+router.post('/:id/availability/sunday', authenticate, requireSelfOrAdmin(), leaveController.updateSundayAvailability);
 
 router.get('/', usersController.getAllUsers);
 
@@ -73,5 +75,7 @@ router.post('/:id/locations', [
   validate
 ], usersController.addLocation);
 router.delete('/:id/locations/:locationId', requireRole('admin'), usersController.removeLocation);
+
+router.delete('/:id', requireRole('admin'), usersController.deleteUser);
 
 export default router;

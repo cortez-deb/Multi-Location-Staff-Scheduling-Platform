@@ -9,7 +9,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', [
-  requireRole('admin'),
+  requireRole('admin', 'manager'),
   query('entityType').optional().isString(),
   query('entityId').optional().isUUID(),
   query('limit').optional().isInt({ min: 1, max: 100 }),

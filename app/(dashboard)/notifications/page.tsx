@@ -15,5 +15,5 @@ export default async function NotificationsPage() {
     .filter(n => n.userId === session.user.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
-  return <NotificationsClient session={session} initialNotifs={notifs} />
+  return <NotificationsClient session={session} initialNotifs={notifs} leaveRequests={db.leaveRequests} />
 }

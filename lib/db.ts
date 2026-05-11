@@ -19,28 +19,32 @@ export async function getDb(): Promise<{
   shifts: Shift[];
   swapRequests: SwapRequest[];
   notifications: AppNotification[];
+  leaveRequests: any[];
   skills: { id: string, name: string }[];
   recurringAvailability: RecurringAvailability[];
   availabilityExceptions: AvailabilityException[];
 }> {
-  const [usersRes, locationsRes, shiftsRes, swapsRes, skillsRes] = await Promise.all([
+  const [usersRes, locationsRes, shiftsRes, swapsRes, skillsRes, notificationsRes, leaveRes] = await Promise.all([
     fetchApi('/api/users'),
     fetchApi('/api/locations'),
     fetchApi('/api/shifts'),
     fetchApi('/api/swaps'),
-    fetchApi('/api/skills')
+    fetchApi('/api/skills'),
+    fetchApi('/api/notifications'),
+    fetchApi('/api/leave')
   ]);
 
   const skillsMap = new Map(skillsRes.map((s: any) => [s.id, s.name]));
 
-  const locations = locationsRes.map((l: any) => ({
+  const locations = (locationsRes || []).map((l: any) => ({
     id: l.id,
-    name: l.name,
-    shortName: l.name.split(' ')[0],
-    timezone: l.timezone,
+    name: l.name || 'Unnamed Location',
+    shortName: (l.name || 'Loc').split(' ')[0],
+    timezone: l.timezone || 'UTC',
     address: l.address || '',
     city: '',
-    color: stringToColor(l.id)
+    color: stringToColor(l.id),
+    shiftCount: l.shiftCount || 0
   }));
 
   const users = usersRes.map((u: any) => {
@@ -55,6 +59,8 @@ export async function getDb(): Promise<{
       skills: (u.skills || u.Skills || []).map((s: any) => s.id || s),
       certifiedLocations: (u.certifiedLocations || u.Locations || []).map((l: any) => l.id),
       managedLocations: (u.managedLocations || []).map((l: any) => l.id),
+      manager: u.manager,
+      reportsToId: u.reportsToId,
 
       desiredHoursPerWeek: u.desiredHours || 40,
       maxHoursPerWeek: 40,
@@ -95,11 +101,12 @@ export async function getDb(): Promise<{
     requesterId: s.requesterId,
     shiftId: s.shiftId,
     targetStaffId: s.targetId,
-    status: s.status === 'PENDING_ACCEPT' || s.status === 'PENDING_MANAGER' ? 'pending' : s.status.toLowerCase(),
+    status: s.status === 'PENDING_ACCEPT' ? 'pending' : (s.status === 'PENDING_MANAGER' ? 'accepted' : s.status.toLowerCase()),
     createdAt: s.createdAt
   }));
 
-  const notifications: any[] = []; // We can fetch notifications if needed, but the UI usually fetches them via client API.
+  const notifications = notificationsRes || [];
+  const leaveRequests = leaveRes || [];
 
   return {
     locations,
@@ -107,6 +114,7 @@ export async function getDb(): Promise<{
     shifts,
     swapRequests,
     notifications,
+    leaveRequests,
     skills: skillsRes,
     recurringAvailability: [],
     availabilityExceptions: []

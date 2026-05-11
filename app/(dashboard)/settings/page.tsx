@@ -15,13 +15,13 @@ export default async function SettingsPage() {
   const db = await getDb()
 
   let managerName = 'None'
-  if (user.role === 'manager') {
-    managerName = 'Jordan Rivera'
-  } else if (user.role === 'staff') {
-    const manager = db.users.find(u => u.role === 'manager' && u.managedLocations.some(l => user.certifiedLocations.includes(l)))
-    if (manager) managerName = manager.name
-  } else if (user.role === 'admin') {
+  if (user.role === 'admin') {
     managerName = 'N/A'
+  } else if (user.manager) {
+    managerName = user.manager.name
+  } else if (user.role === 'manager') {
+    // Managers report to Admin by default in this system
+    managerName = 'Admin'
   }
 
   const { passwordHash: _, ...safeUser } = user

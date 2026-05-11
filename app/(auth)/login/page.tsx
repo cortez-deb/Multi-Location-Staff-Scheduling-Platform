@@ -20,9 +20,6 @@ export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {} as any)
 
   useEffect(() => {
-    // Ensure invalid/expired session is cleared on the client
-    document.cookie = 'shiftsync_session=; Max-Age=0; path=/;';
-    
     if (state?.success) {
       window.location.href = '/dashboard'
     }

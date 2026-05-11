@@ -1,9 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { User, RefreshToken, UserSkill, UserLocation } from '../models/index.js';
+import { User, RefreshToken, UserSkill, UserLocation, Location, Skill } from '../models/index.js';
 import { AuthError, ValidationError } from '../middleware/errorHandler.js';
 import * as reportingService from '../services/reporting.service.js';
+import * as leaveService from '../services/leave.service.js';
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -54,8 +55,12 @@ export async function register(req, res, next) {
     try {
       const actorId = req.user ? req.user.userId : user.id;
       await reportingService.onStaffCreated(user.id, actorId);
+      
+      if (user.role === 'staff') {
+        await leaveService.seedDefaultAvailability(user.id);
+      }
     } catch (hookErr) {
-      console.error('[reporting] failed to seed history on create:', hookErr);
+      console.error('[registration-hooks] failed:', hookErr);
     }
 
     res.status(201).json({ message: 'User registered successfully', userId: user.id });
@@ -68,7 +73,14 @@ export async function login(req, res, next) {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ 
+      where: { email },
+      include: [
+        { model: Location, as: 'certifiedLocations', through: { attributes: [] } },
+        { model: Location, as: 'managedLocations', through: { attributes: [] } },
+        { model: Skill, as: 'skills', through: { attributes: [] } }
+      ]
+    });
     if (!user) {
       throw new AuthError('Invalid email or password');
     }
@@ -89,7 +101,13 @@ export async function login(req, res, next) {
     const userResponse = user.toJSON();
     delete userResponse.passwordHash;
 
-    res.json({ accessToken, refreshToken, user: userResponse });
+    res.json({ 
+      accessToken, 
+      refreshToken, 
+      user: userResponse,
+      managedLocations: user.managedLocations.map(l => l.id),
+      certifiedLocations: user.certifiedLocations.map(l => l.id)
+    });
   } catch (err) {
     next(err);
   }
@@ -101,7 +119,15 @@ export async function refresh(req, res, next) {
 
     const tokenRecord = await RefreshToken.findOne({ 
       where: { token: refreshToken },
-      include: [{ model: User, as: 'user' }]
+      include: [{ 
+        model: User, 
+        as: 'user',
+        include: [
+          { model: Location, as: 'certifiedLocations', through: { attributes: [] } },
+          { model: Location, as: 'managedLocations', through: { attributes: [] } },
+          { model: Skill, as: 'skills', through: { attributes: [] } }
+        ]
+      }]
     });
 
     if (!tokenRecord || tokenRecord.revoked || tokenRecord.expiresAt < new Date()) {
@@ -122,7 +148,12 @@ export async function refresh(req, res, next) {
       expiresAt
     });
 
-    res.json({ accessToken, refreshToken: newRefreshToken });
+    res.json({ 
+      accessToken, 
+      refreshToken: newRefreshToken,
+      managedLocations: user.managedLocations.map(l => l.id),
+      certifiedLocations: user.certifiedLocations.map(l => l.id)
+    });
   } catch (err) {
     next(err);
   }

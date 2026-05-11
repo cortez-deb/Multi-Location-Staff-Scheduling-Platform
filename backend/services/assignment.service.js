@@ -1,7 +1,7 @@
 import { Op } from 'sequelize';
 import { 
   Shift, ShiftAssignment, User, UserLocation, UserSkill, 
-  Availability, AvailabilityException, Location, Skill 
+  Availability, AvailabilityException, Location, Skill, LeaveRequest
 } from '../models/index.js';
 import { shiftWithinAvailability, toLocal, extractLocalDayAndTime } from '../utils/timezone.js';
 import { getDailyHours, getConsecutiveDays, getWeeklyHours } from './labor.service.js';
@@ -100,20 +100,37 @@ export async function checkConstraints(userId, shiftId, overrideReason = null) {
   }
 
   // CHECK 3 — AVAILABILITY WINDOW [HARD]
-  const exception = await AvailabilityException.findOne({ where: { userId, date: localDate } });
+  const exception = await AvailabilityException.findOne({ 
+    where: { userId, date: localDate },
+    include: [{ model: LeaveRequest, as: 'leaveRequest', required: false }]
+  });
+  
   let isAvailable = true;
+  let reason = '';
+
   if (exception) {
-    if (!exception.available) isAvailable = false;
-    else if (exception.startTime && exception.endTime) {
+    if (!exception.available) {
+      isAvailable = false;
+      reason = exception.leaveRequestId 
+        ? `${user.name} is on approved leave.` 
+        : `${user.name} has specifically blocked this day.`;
+    } else if (exception.startTime && exception.endTime) {
       isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), exception.startTime, exception.endTime, tz);
+      if (!isAvailable) {
+        reason = `${user.name} is only available between ${exception.startTime} and ${exception.endTime} on this day.`;
+      }
     }
   } else {
-    const { dayOfWeek } = extractLocalDayAndTime(localStart);
+    const { dayOfWeek, dayName } = extractLocalDayAndTime(localStart);
     const recurring = await Availability.findOne({ where: { userId, dayOfWeek } });
     if (!recurring) {
       isAvailable = false;
+      reason = `${user.name} has no availability set for ${dayName}s.`;
     } else {
       isAvailable = shiftWithinAvailability(startUtc.toISOString(), endUtc.toISOString(), recurring.startTime, recurring.endTime, tz);
+      if (!isAvailable) {
+        reason = `${user.name} is only available between ${recurring.startTime} and ${recurring.endTime} on ${dayName}s.`;
+      }
     }
   }
   
@@ -122,7 +139,7 @@ export async function checkConstraints(userId, shiftId, overrideReason = null) {
     result.violations.push({
       level: 'HARD',
       code: 'UNAVAILABLE',
-      message: `${user.name} is not available during this shift time.`,
+      message: reason || `${user.name} is not available during this shift time.`,
       suggestions: await getSuggestions()
     });
   }

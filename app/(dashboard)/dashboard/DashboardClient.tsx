@@ -15,6 +15,7 @@ type Props = {
   stats: Record<string, number>
   overtimeWarnings: { userId: string; name: string; hours: number; isOvertime: boolean }[]
   locations: Location[]
+  skills: { id: string; name: string }[]
   today: string
 }
 
@@ -28,7 +29,7 @@ const SKILL_COLORS: Record<string, string> = {
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
 
-export function DashboardClient({ session, onDutyNow: initial, stats: initialStats, overtimeWarnings, locations, today }: Props) {
+export function DashboardClient({ session, onDutyNow: initial, stats: initialStats, overtimeWarnings, locations, skills, today }: Props) {
   const router = useRouter()
   const [onDuty, setOnDuty] = useState(initial)
   const [stats, setStats] = useState(initialStats)
@@ -103,10 +104,10 @@ export function DashboardClient({ session, onDutyNow: initial, stats: initialSta
                           <Group gap={12} align="center">
                             <Badge size="sm" variant="light"
                               style={{
-                                background: `${SKILL_COLORS[shift.requiredSkill]}22`,
-                                color: SKILL_COLORS[shift.requiredSkill],
+                                background: `${SKILL_COLORS[skills.find(sk => sk.id === shift.requiredSkill)?.name.toLowerCase().replace(' ', '_') ?? ''] || '#6366f1'}22`,
+                                color: SKILL_COLORS[skills.find(sk => sk.id === shift.requiredSkill)?.name.toLowerCase().replace(' ', '_') ?? ''] || '#6366f1',
                               }}>
-                              {SKILL_LABELS[shift.requiredSkill] ?? shift.requiredSkill}
+                              {skills.find(sk => sk.id === shift.requiredSkill)?.name || shift.requiredSkill}
                             </Badge>
                             <Text size="sm" c="dimmed">{shift.startTime} – {shift.endTime}</Text>
                             <Group gap={0} ml="auto">

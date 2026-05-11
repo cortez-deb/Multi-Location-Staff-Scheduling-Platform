@@ -32,4 +32,14 @@ router.get('/:id/roster', [
   requireRole('admin', 'manager')
 ], locationsController.getRoster);
 
+router.post('/bulk-cutoff', [
+  requireRole('admin'),
+  body('cutoffHours').isNumeric(),
+  validate
+], locationsController.bulkUpdateCutoff);
+
+router.delete('/:id', [
+  requireRole('admin')
+], locationsController.deleteLocation);
+
 export default router;

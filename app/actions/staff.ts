@@ -80,3 +80,15 @@ export async function assignManager(staffId: string, managerId: string | null) {
     return { success: false, error: error.message }
   }
 }
+export async function archiveUser(id: string) {
+  await requireRole('admin')
+  
+  try {
+    await fetchApi(`/api/users/${id}`, { method: 'DELETE' })
+    revalidatePath('/staff')
+    return { success: true }
+  } catch (error: any) {
+    console.error('archiveUser error:', error.message)
+    return { success: false, error: error.message }
+  }
+}

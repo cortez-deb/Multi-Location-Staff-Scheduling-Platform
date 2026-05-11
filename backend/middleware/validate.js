@@ -5,7 +5,7 @@ export function validate(req, res, next) {
   if (!errors.isEmpty()) {
     return res.status(422).json({
       error: 'VALIDATION_ERROR',
-      message: 'Invalid Email or Password',
+      message: 'One or more fields failed validation',
       details: errors.array().reduce((acc, err) => {
         acc[err.path] = err.msg;
         return acc;

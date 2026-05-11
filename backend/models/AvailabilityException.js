@@ -25,6 +25,10 @@ export default (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    leaveRequestId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
   }, {
     sequelize,
     modelName: 'AvailabilityException',

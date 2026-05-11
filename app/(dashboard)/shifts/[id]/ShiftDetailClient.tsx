@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Session, Shift, Location, AuditLog } from '@/lib/types'
 
@@ -8,10 +8,13 @@ const SKILL_COLORS: Record<string, string> = {
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
 
-type SafeUser = { id: string; name: string; skills: string[]; certifiedLocations: string[]; avatarInitials: string; avatarColor: string }
+import { Modal, Button, Group, Stack, Text, Title, Badge, Paper, Box } from '@mantine/core'
+import { ShiftFormModal } from '@/app/components/ShiftFormModal'
 
-export function ShiftDetailClient({ session, shift, location, allStaff, auditLogs, performerMap, apiSkills }: {
-  session: Session; shift: Shift; location: Location
+type SafeUser = { id: string; name: string; email: string; skills: string[]; certifiedLocations: string[]; avatarInitials: string; avatarColor: string }
+
+export function ShiftDetailClient({ session, shift, location, locations, allStaff, auditLogs, performerMap, apiSkills }: {
+  session: Session; shift: Shift; location: Location; locations: Location[]
   allStaff: SafeUser[]; auditLogs: AuditLog[]; performerMap: Record<string, string>
   apiSkills?: { id: string, name: string }[]
 }) {
@@ -22,13 +25,33 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
   const [overrideReason, setOverrideReason] = useState('')
   const [pendingAssign, setPendingAssign] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
+  const [showEdit, setShowEdit] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [search, setSearch] = useState('')
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [fetchingSuggestions, setFetchingSuggestions] = useState(false)
   const isManager = session.user.role !== 'staff'
+  const isFull = shift.assignedStaff.length >= shift.headcount
+  const isLocked = new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000)
 
-  const eligible = allStaff.filter(u =>
-    u.skills.includes(shift.requiredSkill) &&
-    u.certifiedLocations.includes(shift.locationId) &&
-    !shift.assignedStaff.includes(u.id)
-  )
+  useEffect(() => {
+    if (!isManager || isLocked || isFull) return
+
+    const timer = setTimeout(async () => {
+      setFetchingSuggestions(true)
+      try {
+        const res = await fetch(`/api/shifts/${shift.id}/eligible?search=${encodeURIComponent(search)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setSuggestions(data)
+        }
+      } finally {
+        setFetchingSuggestions(false)
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [search, isLocked, isFull, shift.id, isManager])
 
   async function assign(staffId: string, override?: string) {
     setLoading(true); setViolations([]); setWarnings([]); setMsg('')
@@ -39,7 +62,6 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
     const d = await res.json()
     setLoading(false)
     
-    // If successful (HTTP 201), the response is { assignment, warnings }
     if (res.ok) { 
       router.refresh(); 
       setPendingAssign(null);
@@ -74,50 +96,83 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
     setLoading(false); router.refresh()
   }
 
-  const isFull = shift.assignedStaff.length >= shift.headcount
+  async function deleteShift() {
+    setLoading(true)
+    const res = await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.push('/shifts')
+    } else {
+      setLoading(false)
+      setMsg('Failed to delete shift')
+    }
+  }
 
-  const isLocked = new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000)
+
 
   const currentSkill = apiSkills?.find(s => s.id === shift.requiredSkill)
   const skillLabel = currentSkill?.name || shift.requiredSkill
   const skillSlug = (currentSkill?.name || shift.requiredSkill).toLowerCase().replace(' ', '_')
 
   return (
-    <div style={{ padding: '28px 32px 40px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: '28px 32px 40px', maxWidth: 1000, margin: '0 auto' }}>
+      <Modal opened={showDelete} onClose={() => setShowDelete(false)} title="Confirm Delete" size="sm" radius="md" centered>
+        <Text size="sm" mb="md">Are you sure you want to delete this shift? This cannot be undone.</Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setShowDelete(false)}>Cancel</Button>
+          <Button color="red" onClick={deleteShift} loading={loading}>Delete</Button>
+        </Group>
+      </Modal>
+
+      <ShiftFormModal
+        opened={showEdit}
+        onClose={() => setShowEdit(false)}
+        onSaved={() => { setShowEdit(false); router.refresh() }}
+        locations={locations}
+        initialShift={shift}
+        skills={apiSkills}
+      />
+
       {/* Back */}
       <a href="/shifts" style={{ color: 'var(--color-text-muted)', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>← Back to Shifts</a>
 
       {/* Header */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <span className={`badge skill-${skillSlug}`}>{skillLabel}</span>
-              <span className={`badge ${shift.status === 'published' ? 'badge-published' : 'badge-draft'}`}>{shift.status}</span>
-              {shift.isPremium && <span className="badge badge-premium">⭐ Premium</span>}
-              {shift.isOvernight && <span className="badge badge-info">🌙 Overnight</span>}
-              {isLocked && <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>🔒 Locked</span>}
+      <div className="card" style={{ marginBottom: 24, padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <Badge color={SKILL_COLORS[skillSlug] ?? 'indigo'} variant="filled" size="lg" radius="sm">{skillLabel}</Badge>
+              <Badge color={shift.status === 'published' ? 'green' : 'gray'} variant="dot" size="lg">{shift.status}</Badge>
+              {shift.isPremium && <Badge color="orange" variant="light">⭐ Premium</Badge>}
+              {shift.isOvernight && <Badge color="cyan" variant="light">🌙 Overnight</Badge>}
+              {isLocked && <Badge color="red" variant="filled" leftSection={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 12, height: 12}}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>}>Locked</Badge>}
             </div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{location.shortName}</h1>
-            <p style={{ color: 'var(--color-text-muted)', margin: '6px 0 0', fontSize: 14 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>{location.shortName}</h1>
+            <Text c="dimmed" size="sm" mt={4} fw={500}>
               {shift.date} · {shift.startTime}–{shift.endTime} · {location.timezone}
-            </p>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '4px 0 0' }}>{location.address}</p>
+            </Text>
+            <Text c="dimmed" size="xs" mt={2}>{location.address}</Text>
+            
             {shift.notes && (
-              <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13 }}>
-                <strong style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 4, letterSpacing: '0.05em' }}>Manager Notes</strong>
-                <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{shift.notes}</span>
-              </div>
+              <Paper mt={16} p="md" radius="md" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Text size="10px" fw={700} tt="uppercase" c="dimmed" mb={4} lts="0.05em">Manager Notes</Text>
+                <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{shift.notes}</Text>
+              </Paper>
             )}
           </div>
+
           {isManager && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-primary" onClick={togglePublish} disabled={loading || isLocked} style={{ opacity: isLocked ? 0.6 : 1 }}>
+            <Stack gap={10} style={{ minWidth: 200 }}>
+              {isLocked && (
+                <Text size="xs" c="red" fw={600} style={{ textAlign: 'right' }}>Locked (Past edit cutoff)</Text>
+              )}
+              <Group grow gap={8}>
+                <Button variant="default" onClick={() => setShowEdit(true)} disabled={isLocked}>Edit</Button>
+                <Button variant="light" color={shift.status === 'published' ? 'gray' : 'green'} onClick={togglePublish} loading={loading} disabled={isLocked}>
                   {shift.status === 'published' ? 'Unpublish' : 'Publish'}
-                </button>
-              </div>
-            </div>
+                </Button>
+              </Group>
+              <Button variant="subtle" color="red" fullWidth onClick={() => setShowDelete(true)} disabled={isLocked}>Delete Shift</Button>
+            </Stack>
           )}
         </div>
 
@@ -185,8 +240,26 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
               {isLocked ? 'Staff Assigned' : 'Add Staff'}
             </h2>
+            
+            {!isLocked && (
+              <Box mb={16}>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    className="input" 
+                    placeholder="Search by name or email..." 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ paddingLeft: 36, fontSize: 13 }}
+                  />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ position: 'absolute', left: 12, top: 10, width: 16, height: 16, color: 'var(--color-text-muted)' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                </div>
+              </Box>
+            )}
+
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
-              {isLocked ? 'Assignment is locked for this shift.' : `Showing ${eligible.length} eligible (${skillLabel} + certified)`}
+              {isLocked ? 'Assignment is locked for this shift.' : `Showing ${suggestions.length} eligible (${skillLabel} + certified)`}
             </p>
 
             {/* Violation messages */}
@@ -221,18 +294,24 @@ export function ShiftDetailClient({ session, shift, location, allStaff, auditLog
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
-              {eligible.map(s => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', position: 'relative' }}>
+              {fetchingSuggestions && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                  <Text size="xs" c="dimmed">Searching...</Text>
+                </div>
+              )}
+              {suggestions.map(s => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 8 }}>
                   <div className="avatar" style={{ background: s.avatarColor, color: '#fff', fontSize: 11, width: 30, height: 30 }}>{s.avatarInitials}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{s.email}</div>
                   </div>
                   <button className="btn btn-primary btn-sm" onClick={() => assign(s.id)} disabled={loading}>+ Assign</button>
                 </div>
               ))}
-              {eligible.length === 0 && (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No eligible staff available</p>
+              {suggestions.length === 0 && !fetchingSuggestions && (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No matching staff available</p>
               )}
             </div>
             {msg && <p style={{ color: '#ef4444', fontSize: 13, marginTop: 8 }}>{msg}</p>}

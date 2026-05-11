@@ -8,7 +8,7 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import type { Session, Location } from '@/lib/types'
-import { addUser, updateUser, assignManager } from '@/app/actions/staff'
+import { addUser, updateUser, assignManager, archiveUser } from '@/app/actions/staff'
 
 const SKILL_LABELS: Record<string, string> = {
   bartender: 'Bartender', line_cook: 'Line Cook', server: 'Server',
@@ -44,7 +44,9 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
   const [editingUser, setEditingUser] = useState<any | null>(null)
+  const [archiveModalUser, setArchiveModalUser] = useState<any | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -237,7 +239,8 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
                       {user.skills.map((sk: any) => {
                         const apiSkill = apiSkills?.find(s => s.id === sk)
                         const label = apiSkill ? apiSkill.name : (typeof sk === 'string' ? sk.replace('_', ' ') : 'Unknown')
-                        const color = getColor(sk)
+                        const skillSlug = label.toLowerCase().replace(' ', '_')
+                        const color = SKILL_COLORS[skillSlug] || getColor(sk)
                         return (
                           <Badge
                             key={sk}
@@ -313,9 +316,15 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
                           </svg>
                         )}
                       </Text>
-                      {(session.user.role === 'admin' || 
-                        (session.user.role === 'manager' && user.certifiedLocations.some((l: string) => session.managedLocations.includes(l as any)))) && (
-                        <Button size="compact-xs" variant="light" onClick={(e) => handleOpenEdit(e, user)}>Edit</Button>
+                      {session.user.role === 'admin' && (
+                        <Group gap={8}>
+                          <Button size="compact-xs" variant="light" onClick={(e) => handleOpenEdit(e, user)}>Edit</Button>
+                          <Button size="compact-xs" variant="light" color="red" onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setArchiveModalUser(user)
+                          }}>Delete</Button>
+                        </Group>
                       )}
                     </Group>
                   </Table.Td>
@@ -336,6 +345,33 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
           </Box>
         )}
       </Table.ScrollContainer>
+
+      {/* Archive Confirmation Modal */}
+      <Modal opened={!!archiveModalUser} onClose={() => setArchiveModalUser(null)} title={<Text fw={700}>Archive User</Text>} centered radius="md">
+        <Stack gap="md">
+          <Text size="sm">
+            Are you sure you want to archive <strong>{archiveModalUser?.name}</strong>?
+          </Text>
+          <Text size="xs" c="dimmed">
+            This will deactivate their account and remove them from active schedules, but their historical data will be preserved.
+          </Text>
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={() => setArchiveModalUser(null)}>Cancel</Button>
+            <Button color="red" loading={isArchiving} onClick={async () => {
+              if (!archiveModalUser) return
+              setIsArchiving(true)
+              const res = await archiveUser(archiveModalUser.id)
+              setIsArchiving(false)
+              if (res.success) {
+                notifications.show({ title: 'User Archived', message: `${archiveModalUser.name} has been deactivated.`, color: 'blue' })
+                setArchiveModalUser(null)
+              } else {
+                notifications.show({ title: 'Error', message: res.error, color: 'red' })
+              }
+            }}>Archive Staff</Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title={<Text fw={700}>{editingUser ? 'Edit User' : 'Add User'}</Text>} radius="md" size={editingUser ? 'sm' : 'lg'}>
         {editingUser ? (

@@ -13,7 +13,12 @@ export default async function DashboardPage() {
   let db: Awaited<ReturnType<typeof getDb>>
   try {
     db = await getDb()
-  } catch (err) {
+  } catch (err: any) {
+    // If it's a Next.js redirect, we MUST rethrow it so Next.js can handle the redirect
+    if (err.digest?.startsWith('NEXT_REDIRECT') || err.message === 'NEXT_REDIRECT') {
+      throw err
+    }
+    
     console.error('DashboardPage: failed to load data', err)
     // Render shell with empty state rather than crashing
     return (
@@ -23,6 +28,7 @@ export default async function DashboardPage() {
         stats={{ totalStaff: 0, shiftsToday: 0, staffOnDuty: 0, pendingSwaps: 0, draftShifts: 0, overtimeCount: 0 }}
         overtimeWarnings={[]}
         locations={[]}
+        skills={[]}
         today={new Date().toISOString().split('T')[0]}
       />
     )
@@ -34,11 +40,12 @@ export default async function DashboardPage() {
   const onDutyNow = db.shifts
     .filter(s => s.status === 'published' && s.assignedStaff.length > 0)
     .filter(s => {
-      const loc = db.locations.find(l => l.id === s.locationId)!
+      const loc = db.locations.find(l => l.id === s.locationId)
+      if (!loc) return false
       return isShiftActiveNow(s.date, s.startTime, s.endTime, loc.timezone)
     })
     .map(s => {
-      const loc = db.locations.find(l => l.id === s.locationId)!
+      const loc = db.locations.find(l => l.id === s.locationId)
       return {
         ...s,
         location: loc,
@@ -63,7 +70,8 @@ export default async function DashboardPage() {
   const weekShifts = db.shifts.filter(s => s.date >= monStr && s.date <= sunStr && s.status === 'published')
   const weeklyHours: Record<string, number> = {}
   for (const s of weekShifts) {
-    const loc = db.locations.find(l => l.id === s.locationId)!
+    const loc = db.locations.find(l => l.id === s.locationId)
+    if (!loc) continue
     const { start, end } = getShiftUTCTimes(s.date, s.startTime, s.endTime, loc.timezone)
     const hrs = durationHours(start, end)
     for (const sid of s.assignedStaff) {
@@ -102,6 +110,7 @@ export default async function DashboardPage() {
       stats={stats}
       overtimeWarnings={overtimeWarnings}
       locations={locations}
+      skills={db.skills}
       today={today}
     />
   )

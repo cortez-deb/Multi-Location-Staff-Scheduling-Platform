@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
-import { User, ManagerLocation } from '../models/index.js';
+import { User, ManagerLocation, UserLocation } from '../models/index.js';
 
 let ioInstance = null;
 
@@ -47,6 +47,13 @@ export function initSocket(httpServer, redisClient) {
           const managedLocs = await ManagerLocation.findAll({ where: { userId: user.id } });
           for (const ml of managedLocs) {
             socket.join(`location:${ml.locationId}`);
+          }
+        }
+
+        if (user.role === 'staff') {
+          const certLocs = await UserLocation.findAll({ where: { userId: user.id } });
+          for (const cl of certLocs) {
+            socket.join(`location:${cl.locationId}`);
           }
         }
 

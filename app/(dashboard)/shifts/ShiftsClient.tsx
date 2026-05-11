@@ -15,10 +15,11 @@ const SKILL_COLORS: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = { published: 'green', draft: 'gray' }
 
-export function ShiftsClient({ session, shifts, staffMap, locations }: {
+export function ShiftsClient({ session, shifts, staffMap, locations, skills }: {
   session: Session; shifts: Shift[]
   staffMap: Record<string, { id: string; name: string; avatarInitials: string; avatarColor: string }>
   locations: Location[]
+  skills: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const [filterStatus, setFilterStatus] = useState<string | null>(null)
@@ -33,7 +34,8 @@ export function ShiftsClient({ session, shifts, staffMap, locations }: {
     if (filterSkill && s.requiredSkill !== filterSkill) return false
     if (search) {
       const loc = locations.find(l => l.id === s.locationId)
-      const text = `${s.date} ${s.requiredSkill} ${loc?.shortName ?? ''}`.toLowerCase()
+      const skillName = skills.find(sk => sk.id === s.requiredSkill)?.name ?? ''
+      const text = `${s.date} ${skillName} ${loc?.shortName ?? ''}`.toLowerCase()
       if (!text.includes(search.toLowerCase())) return false
     }
     return true
@@ -83,7 +85,7 @@ export function ShiftsClient({ session, shifts, staffMap, locations }: {
                     <Group gap={4} wrap="nowrap">
                       <Badge size="sm" variant="light"
                         style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}>
-                        {shift.requiredSkill.replace('_', ' ')}
+                        {(skills.find(s => s.id === shift.requiredSkill)?.name || shift.requiredSkill).replace('_', ' ')}
                       </Badge>
                       {shift.isPremium && <Text size="sm">⭐</Text>}
                     </Group>
@@ -158,13 +160,13 @@ export function ShiftsClient({ session, shifts, staffMap, locations }: {
           />
           <Select
             placeholder="All Skills"
-            data={['bartender', 'line_cook', 'server', 'host', 'supervisor', 'expo', 'busser'].map(s => ({
-              value: s, label: s.replace('_', ' '),
+            data={skills.map(s => ({
+              value: s.id, label: s.name,
             }))}
             value={filterSkill}
             onChange={setFilterSkill}
             clearable
-            style={{ width: 140 }}
+            style={{ width: 160 }}
           />
         </Group>
       </Group>

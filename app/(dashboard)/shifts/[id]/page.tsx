@@ -25,6 +25,7 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
       session={session}
       shift={shift}
       location={location}
+      locations={db.locations}
       allStaff={allStaff}
       auditLogs={auditLogs}
       performerMap={performerMap}

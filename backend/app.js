@@ -12,6 +12,7 @@ import laborRoutes from './routes/labor.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import auditRoutes from './routes/audit.routes.js';
+import leaveRoutes from './routes/leave.routes.js';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/labor', laborRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/leave', leaveRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

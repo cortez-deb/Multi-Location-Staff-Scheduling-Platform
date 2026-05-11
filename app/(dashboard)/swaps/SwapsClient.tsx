@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Box, Group, Stack, Text, Title, Badge, Button, Paper, Modal,
@@ -21,16 +21,26 @@ export function SwapsClient({ session, swaps, locations, allStaff }: {
   const [showCreate, setShowCreate] = useState(false)
   const isManager = session.user.role !== 'staff'
 
-  const filtered = filter === 'all' ? swaps : swaps.filter(s => s.status === filter)
+  const filtered = (filter === 'all' ? swaps : swaps.filter(s => s.status === filter)).map(s => ({
+    ...s,
+    type: s.targetId ? 'swap' : 'drop'
+  }))
   const pendingCount = swaps.filter(s => s.status === 'pending' || s.status === 'accepted').length
 
   async function act(id: string, action: string, note = '') {
     setLoading(id)
-    await fetch(`/api/swaps/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, managerNote: note }),
-    })
-    setLoading(null); router.refresh()
+    try {
+      await fetch(`/api/swaps/${id}/${action}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: action === 'reject' ? JSON.stringify({ managerNote: note }) : undefined,
+      })
+      router.refresh()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
   }
 
   return (
@@ -165,14 +175,47 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
 }) {
   const [form, setForm] = useState({ type: 'drop', shiftId: '', targetStaffId: '', requesterNote: '' })
   const [myShifts, setMyShifts] = useState<any[]>([])
+  const [eligibleStaff, setEligibleStaff] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [fetchingStaff, setFetchingStaff] = useState(false)
   const [error, setError] = useState('')
 
-  useState(() => {
-    fetch(`/api/shifts?staffId=${session.user.id}&status=published`).then(r => r.json()).then(d => {
-      if (d.success) setMyShifts(d.data.filter((s: any) => s.date >= new Date().toISOString().split('T')[0]))
-    })
-  })
+  useEffect(() => {
+    if (opened && form.shiftId && form.type === 'swap') {
+      setFetchingStaff(true)
+      fetch(`/api/shifts/${form.shiftId}/eligible`)
+        .then(r => r.json())
+        .then(data => {
+          setEligibleStaff(Array.isArray(data) ? data : [])
+          setFetchingStaff(false)
+        })
+        .catch(() => setFetchingStaff(false))
+    } else {
+      setEligibleStaff([])
+    }
+  }, [form.shiftId, form.type, opened])
+
+  useEffect(() => {
+    if (opened) {
+      fetch(`/api/shifts?staffId=${session.user.id}&published=true`)
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const now = new Date().toISOString().split('T')[0]
+            const mapped = data.map((s: any) => {
+              const start = new Date(s.startUtc)
+              const end = new Date(s.endUtc)
+              return {
+                id: s.id,
+                date: s.startUtc.split('T')[0],
+                label: `${s.startUtc.split('T')[0]} ${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}–${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} (${s.skill?.name || 'Staff'})`
+              }
+            }).filter((s: any) => s.date >= now)
+            setMyShifts(mapped)
+          }
+        })
+    }
+  }, [opened, session.user.id])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setLoading(true); setError('')
@@ -182,8 +225,8 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
     })
     const d = await res.json()
     setLoading(false)
-    if (d.success) onCreated()
-    else setError(d.error)
+    if (res.ok) onCreated()
+    else setError(d.error || d.message || 'Failed to create request')
   }
 
   return (
@@ -211,7 +254,7 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
           <Select
             label="Your Shift"
             placeholder="Select a shift…"
-            data={myShifts.map(s => ({ value: s.id, label: `${s.date} ${s.startTime}–${s.endTime} (${s.requiredSkill})` }))}
+            data={myShifts.map(s => ({ value: s.id, label: s.label }))}
             value={form.shiftId}
             onChange={v => setForm(f => ({ ...f, shiftId: v ?? '' }))}
             required
@@ -220,10 +263,12 @@ function CreateSwapModal({ opened, session, allStaff, onClose, onCreated }: {
           {form.type === 'swap' && (
             <Select
               label="Swap With"
-              placeholder="Select staff…"
-              data={allStaff.filter(u => u.id !== session.user.id).map(u => ({ value: u.id, label: u.name }))}
+              placeholder={fetchingStaff ? "Loading qualified staff…" : (eligibleStaff.length > 0 ? "Select staff…" : "No qualified staff found")}
+              data={eligibleStaff.filter(u => u.id !== session.user.id).map(u => ({ value: u.id, label: u.name }))}
               value={form.targetStaffId}
               onChange={v => setForm(f => ({ ...f, targetStaffId: v ?? '' }))}
+              disabled={fetchingStaff || !form.shiftId || (eligibleStaff.length === 0 && !fetchingStaff)}
+              nothingFoundMessage="No qualified staff found for this shift"
               required
             />
           )}

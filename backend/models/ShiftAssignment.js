@@ -10,7 +10,7 @@ export default (sequelize) => {
       primaryKey: true,
     },
     status: {
-      type: DataTypes.ENUM('assigned', 'dropped', 'swapped'),
+      type: DataTypes.ENUM('assigned', 'dropped', 'swapped', 'cancelled'),
       defaultValue: 'assigned',
     },
   }, {

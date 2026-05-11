@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { getWeekStart, getWeekDays, addDays } from '@/lib/timezone'
 import { ScheduleClient } from './ScheduleClient'
+import { fetchApi } from '@/lib/api'
 
 export const metadata = { title: 'Schedule' }
 
@@ -41,9 +42,22 @@ export default async function SchedulePage({
   )
   const locations = db.locations.filter(l =>
     session.user.role === 'admin' ? true :
-      session.user.role === 'manager' ? session.managedLocations.includes(l.id) :
-        session.certifiedLocations.includes(l.id)
+      session.user.role === 'manager' ? (session.managedLocations || []).includes(l.id) :
+        (session.certifiedLocations || []).includes(l.id)
   )
+
+  // Ensure manager sees at least one location if they manage any
+  const finalLocationFilter = locationFilter || (session.user.role === 'manager' ? session.managedLocations?.[0] : null)
+
+  // Fetch leave requests for the week
+  let leaveRequests = []
+  try {
+    const statusFilter = '' // All statuses or filter as needed
+    const userIdFilter = session.user.role === 'staff' ? `&userId=${session.user.id}` : ''
+    leaveRequests = await fetchApi(`/api/leave?${userIdFilter}`)
+  } catch (err) {
+    console.error('Failed to fetch leave requests', err)
+  }
 
   return (
     <ScheduleClient
@@ -53,9 +67,10 @@ export default async function SchedulePage({
       weekStart={weekStart}
       staffMap={staffMap}
       locations={locations}
-      selectedLocation={locationFilter}
+      selectedLocation={finalLocationFilter}
       today={today}
       skills={db.skills}
+      leaveRequests={leaveRequests}
     />
   )
 }

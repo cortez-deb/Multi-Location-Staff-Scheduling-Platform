@@ -20,5 +20,5 @@ export default async function ShiftsPage() {
   const staffMap = Object.fromEntries(db.users.map(u => [u.id, { id: u.id, name: u.name, avatarInitials: u.avatarInitials, avatarColor: u.avatarColor }]))
   const locations = db.locations
 
-  return <ShiftsClient session={session} shifts={shifts} staffMap={staffMap} locations={locations} />
+  return <ShiftsClient session={session} shifts={shifts} staffMap={staffMap} locations={locations} skills={db.skills} />
 }

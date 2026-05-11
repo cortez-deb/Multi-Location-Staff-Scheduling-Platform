@@ -7,6 +7,7 @@ import {
   Select, Textarea, NumberInput, TextInput, Paper, Divider,
 } from '@mantine/core'
 import { getShiftUTCTimes } from '@/lib/timezone'
+import { ShiftFormModal } from '@/app/components/ShiftFormModal'
 import type { Session, Location, Shift } from '@/lib/types'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -27,9 +28,10 @@ type Props = {
   selectedLocation: string | null
   today: string
   skills: { id: string, name: string }[]
+  leaveRequests: any[]
 }
 
-export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap, locations, selectedLocation, today, skills }: Props) {
+export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap, locations, selectedLocation, today, skills, leaveRequests }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
@@ -37,6 +39,8 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
   const [editShiftData, setEditShiftData] = useState<Partial<Shift> | null>(null)
   const [dragError, setDragError] = useState<string | null>(null)
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [showMyLeave, setShowMyLeave] = useState(false)
   const isManager = session.user.role !== 'staff'
 
   function navigate(dir: 'prev' | 'next') {
@@ -78,7 +82,15 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         </Box>
 
         <Group gap={8} wrap="wrap">
-          {/* Week nav */}
+          <Select
+            size="xs"
+            placeholder="All Locations"
+            data={locations.map(l => ({ value: l.id, label: l.name }))}
+            value={selectedLocation}
+            onChange={v => selectLocation(v ?? '')}
+            clearable
+            style={{ width: 180 }}
+          />
           <Button size="xs" variant="default" onClick={() => navigate('prev')}>← Prev</Button>
           <Button size="xs" variant="default" onClick={() => startTransition(() =>
             router.push(`/schedule?weekOf=${today}${selectedLocation ? `&location=${selectedLocation}` : ''}`)
@@ -91,57 +103,34 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
             </Button>
           )}
           {isManager && (
-            <Button size="xs" variant="default" onClick={() => setShowCreate(true)}>+ New Shift</Button>
+            <Button size="xs" variant="default" onClick={() => { setSelectedDate(today); setShowCreate(true) }}>+ New Shift</Button>
+          )}
+          {!isManager && (
+            <Group gap={8}>
+              <Button size="xs" variant="default" onClick={() => setShowMyLeave(true)}>My Requests</Button>
+              <Button size="xs" variant="light" color="indigo" onClick={() => setShowLeaveModal(true)}>✈ Request Leave</Button>
+            </Group>
           )}
         </Group>
       </Group>
 
-      {/* Location tabs */}
-      {locations.length > 1 && (
-        <Group gap={8} mb={20} wrap="wrap">
-          <Button
-            size="xs"
-            variant={!selectedLocation ? 'filled' : 'subtle'}
-            color="indigo"
-            onClick={() => startTransition(() => router.push(`/schedule?weekOf=${weekStart}`))}
-          >All Locations</Button>
-          {locations.map(loc => (
-            <Button
-              key={loc.id}
-              size="xs"
-              variant={selectedLocation === loc.id ? 'filled' : 'subtle'}
-              color="indigo"
-              onClick={() => selectLocation(loc.id)}
-              style={selectedLocation !== loc.id ? { borderLeft: `3px solid ${loc.color}` } : {}}
-            >{loc.shortName}</Button>
-          ))}
-        </Group>
-      )}
-
-      {/* Calendar Grid */}
-      <Box
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '72px repeat(7, 1fr)',
-          gap: 1,
-          background: 'var(--border-subtle)',
-          borderRadius: 12,
-          overflow: 'hidden',
-          border: '1px solid var(--border-light)',
-        }}
-      >
+      {/* Grid */}
+      <Box style={{ 
+        display: 'grid', 
+        gridTemplateColumns: `140px repeat(7, 1fr)`,
+        background: 'var(--border-subtle)',
+        gap: 1,
+        borderRadius: 12,
+        overflow: 'hidden',
+        border: '1px solid var(--border-subtle)',
+      }}>
         {/* Header row */}
-        <Box style={{ background: 'var(--bg-card)', padding: '10px 8px' }} />
+        <Box style={{ background: 'var(--bg-card)', padding: '16px 12px' }} />
         {weekDays.map((day, i) => {
-          const d = new Date(day + 'T12:00:00Z')
           const isToday = day === today
+          const d = new Date(day + 'T12:00:00Z')
           return (
-            <Box key={day} style={{
-              background: 'var(--bg-card)',
-              padding: '10px 8px',
-              textAlign: 'center',
-              borderLeft: isToday ? '2px solid #6366f1' : undefined,
-            }}>
+            <Box key={day} style={{ background: isToday ? 'var(--bg-today)' : 'var(--bg-card)', padding: '16px 12px', textAlign: 'center' }}>
               <Text size="xs" c="dimmed" fw={600} tt="uppercase" lts="0.05em">{DAYS[i]}</Text>
               <Text size="xl" fw={800} c={isToday ? 'indigo' : 'var(--text-default)'} mt={2}>
                 {d.getUTCDate()}
@@ -153,7 +142,6 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         {/* Location rows */}
         {(selectedLocation ? locations.filter(l => l.id === selectedLocation) : locations).map(loc => (
           <Fragment key={loc.id}>
-            {/* Location label */}
             <Box style={{
               background: 'var(--bg-cell)', padding: '12px 8px',
               display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
@@ -166,16 +154,18 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
               </Text>
             </Box>
 
-            {/* Day cells */}
             {weekDays.map(day => {
               const dayShifts = shifts.filter(s => s.locationId === loc.id && s.date === day)
               const isToday = day === today
+              const dayLeave = leaveRequests.find(lr => 
+                lr.userId === session.user.id &&
+                (lr.status === 'PENDING' || lr.status === 'APPROVED') && 
+                day >= lr.startDate && day <= lr.endDate
+              )
+              
               return (
                 <Box key={`${loc.id}-${day}`}
-                  onDragOver={(e) => {
-                    if (!isManager) return
-                    e.preventDefault() // Allow drop
-                  }}
+                  onDragOver={(e) => { if (isManager) e.preventDefault() }}
                   onDrop={(e) => {
                     if (!isManager) return
                     e.preventDefault()
@@ -191,19 +181,35 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
                       return
                     }
                     const shiftToEdit = shifts.find(s => s.id === shiftId)
-                    if (shiftToEdit) {
-                      setEditShiftData({ ...shiftToEdit, date: day })
-                    }
+                    if (shiftToEdit) setEditShiftData({ ...shiftToEdit, date: day })
                   }}
                   style={{
-                  background: 'var(--bg-cell)',
-                  padding: '6px',
-                  minHeight: 90,
-                  borderLeft: isToday ? '2px solid rgba(99,102,241,0.3)' : undefined,
-                }}>
-                    {dayShifts.map(shift => (
-                      <ShiftCard key={shift.id} shift={shift} staffMap={staffMap} isManager={isManager} onClick={() => setSelectedShift(shift)} skills={skills} />
-                    ))}
+                    background: dayLeave?.status === 'APPROVED' ? 'rgba(239, 68, 68, 0.05)' : 'var(--bg-cell)',
+                    padding: '6px',
+                    minHeight: 110,
+                    borderLeft: isToday ? '2px solid rgba(99,102,241,0.3)' : undefined,
+                    position: 'relative',
+                  }}>
+                    {dayLeave && (
+                      <Box style={{ 
+                        position: 'absolute', inset: 0, 
+                        background: dayLeave.status === 'APPROVED' ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                        border: dayLeave.status === 'PENDING' ? '1px dashed rgba(99, 102, 241, 0.3)' : undefined,
+                        zIndex: 0, pointerEvents: 'none'
+                      }}>
+                        <Badge size="xs" variant="filled" color={dayLeave.status === 'APPROVED' ? 'red' : 'indigo'} 
+                          style={{ position: 'absolute', top: 4, right: 4, opacity: 0.8 }}>
+                          {dayLeave.status === 'APPROVED' ? 'On Leave' : 'Leave Pending'}
+                        </Badge>
+                      </Box>
+                    )}
+                    
+                    <Stack gap={4} style={{ position: 'relative', zIndex: 1 }}>
+                      {dayShifts.map(shift => (
+                        <ShiftCard key={shift.id} shift={shift} staffMap={staffMap} isManager={isManager} onClick={() => setSelectedShift(shift)} skills={skills} />
+                      ))}
+                    </Stack>
+
                   {isManager && (
                     <button
                       className="schedule-add-btn"
@@ -218,7 +224,7 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         ))}
       </Box>
 
-      {/* Shift Detail Modal */}
+      {/* Modals */}
       <ShiftDetailModal
         shift={selectedShift}
         staffMap={staffMap}
@@ -226,11 +232,10 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         session={session}
         skills={skills}
         onClose={() => setSelectedShift(null)}
-        onEdit={(s) => { setSelectedShift(null); setEditShiftData(s) }}
+        onEdit={(s: Shift) => { setSelectedShift(null); setEditShiftData(s) }}
         onUpdate={() => { setSelectedShift(null); router.refresh() }}
       />
 
-      {/* Drag Error Modal */}
       <Modal opened={!!dragError} onClose={() => setDragError(null)} title="Invalid Move" size="sm" radius="md">
         <Text size="sm" mb="md">{dragError}</Text>
         <Group justify="flex-end">
@@ -238,13 +243,23 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
         </Group>
       </Modal>
 
-      {/* Shift Form Modal (Create or Edit) */}
+      <LeaveRequestModal
+        opened={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onSaved={() => { setShowLeaveModal(false); router.refresh() }}
+      />
+
+      <MyLeaveModal
+        opened={showMyLeave}
+        onClose={() => setShowMyLeave(false)}
+        leaveRequests={leaveRequests.filter(lr => lr.userId === session.user.id)}
+        onUpdated={() => router.refresh()}
+      />
+
       {(showCreate || !!editShiftData) && (
         <ShiftFormModal
           opened={true}
-          locations={locations.filter(l =>
-            session.user.role === 'admin' ? true : session.managedLocations.includes(l.id)
-          )}
+          locations={locations}
           onClose={() => { setShowCreate(false); setEditShiftData(null) }}
           onSaved={() => { setShowCreate(false); setEditShiftData(null); router.refresh() }}
           defaultDate={selectedDate}
@@ -256,341 +271,262 @@ export function ScheduleClient({ session, shifts, weekDays, weekStart, staffMap,
   )
 }
 
-function ShiftCard({ shift, staffMap, isManager, onClick, skills }: { shift: Shift; staffMap: Record<string, StaffInfo>; isManager: boolean; onClick: () => void; skills: {id: string, name: string}[] }) {
-  const currentSkill = skills.find(s => s.id === shift.requiredSkill)
-  const skillLabel = currentSkill?.name || shift.requiredSkill
-  const skillSlug = (currentSkill?.name || shift.requiredSkill).toLowerCase().replace(' ', '_')
-  const color = SKILL_COLORS[skillSlug] ?? '#6366f1'
-  const filled = shift.assignedStaff.length
-  const pct = Math.round((filled / shift.headcount) * 100)
+// --- Sub-components ---
 
-  return (
-    <Box
-      onClick={onClick}
-      draggable={isManager}
-      onDragStart={(e) => {
-        if (!isManager) return
-        e.dataTransfer.setData('shiftId', shift.id)
-        e.dataTransfer.setData('locationId', shift.locationId)
-        e.dataTransfer.effectAllowed = 'move'
-      }}
-      style={{
-        background: `${color}15`,
-        border: `1px solid ${color}30`,
-        borderLeft: `3px solid ${color}`,
-        borderRadius: 7, padding: '6px 8px', marginBottom: 4, cursor: 'pointer',
-        transition: 'all 0.15s',
-      }}
-      onMouseOver={e => (e.currentTarget.style.background = `${color}25`)}
-      onMouseOut={e => (e.currentTarget.style.background = `${color}15`)}
-    >
-      <Group justify="space-between" align="center" gap={4}>
-        <Text size="xs" fw={700} tt="uppercase" lts="0.04em" c={color}>
-          {skillLabel.replace('_', ' ')}
-        </Text>
-        <Group gap={4}>
-          {shift.isPremium && <Text size="xs">⭐</Text>}
-          {shift.status === 'draft' && (
-            <Text size="xs" style={{ background: 'var(--bg-draft)', color: '#94a3b8', padding: '1px 4px', borderRadius: 3 }}>
-              DRAFT
-            </Text>
-          )}
-        </Group>
-      </Group>
-      <Text size="xs" c="dimmed" mt={2}>{shift.startTime}–{shift.endTime}</Text>
-      <Group gap={4} mt={4} align="center">
-        <Box flex={1} style={{ height: 3, background: 'var(--bg-progress)', borderRadius: 2 }}>
-          <Box style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: filled >= shift.headcount ? '#10b981' : color, borderRadius: 2 }} />
-        </Box>
-        <Text size="xs" c={filled >= shift.headcount ? 'green' : 'dimmed'} fw={600}>
-          {filled}/{shift.headcount}
-        </Text>
-      </Group>
-    </Box>
-  )
-}
-
-function ShiftDetailModal({ shift, staffMap, location, session, onClose, onUpdate, onEdit, skills }: {
-  shift: Shift | null; staffMap: Record<string, StaffInfo>; location: Location | null; session: Session; onClose: () => void; onUpdate: () => void; onEdit: (s: Shift) => void; skills: {id: string, name: string}[]
-}) {
+function LeaveRequestModal({ opened, onClose, onSaved }: { opened: boolean; onClose: () => void; onSaved: () => void }) {
   const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
-  const isManager = session.user.role !== 'staff'
-
-  async function publish() {
-    if (!shift) return
-    setLoading(true)
-    const res = await fetch(`/api/shifts/${shift.id}/publish`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: shift.status === 'published' ? 'unpublish' : 'publish' }),
-    })
-    const d = await res.json()
-    setLoading(false)
-    if (d.success) onUpdate()
-    else setMsg(d.error)
-  }
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const isLocked = shift ? new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000) : false
-
-  const currentSkill = skills.find(s => s.id === shift?.requiredSkill)
-  const skillLabel = currentSkill?.name || shift?.requiredSkill || ''
-  const skillSlug = skillLabel.toLowerCase().replace(' ', '_')
-
-  async function deleteShift() {
-    setLoading(true)
-    await fetch(`/api/shifts/${shift?.id}`, { method: 'DELETE' })
-    setLoading(false)
-    setShowDeleteConfirm(false)
-    onUpdate()
-  }
-
-  return (
-    <>
-    <Modal opened={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete" size="sm" radius="md" centered zIndex={3000}>
-      <Stack gap="md">
-        <Text size="sm">Are you sure you want to delete this shift? This action cannot be undone.</Text>
-        <Group justify="flex-end" gap="sm">
-          <Button variant="default" onClick={() => setShowDeleteConfirm(false)} size="xs">Cancel</Button>
-          <Button color="red" onClick={deleteShift} loading={loading} size="xs">Delete Shift</Button>
-        </Group>
-      </Stack>
-    </Modal>
-
-    <Modal opened={!!shift} onClose={onClose} title={location?.shortName ?? 'Shift Detail'} size="md" radius="lg">
-      {shift && (
-        <Stack gap="md">
-          <Group gap={8} wrap="wrap">
-            <Badge size="sm" variant="light"
-              style={{ background: `${SKILL_COLORS[skillSlug] ?? '#6366f1'}22`, color: SKILL_COLORS[skillSlug] ?? '#6366f1' }}>
-              {skillLabel.replace('_', ' ')}
-            </Badge>
-            <Badge size="sm" color={shift.status === 'published' ? 'green' : 'gray'} variant="light">{shift.status}</Badge>
-            {shift.isPremium && <Badge size="sm" color="yellow" variant="light">⭐ Premium</Badge>}
-            {isLocked && <Badge size="sm" color="red" variant="dot">Locked (Cutoff)</Badge>}
-          </Group>
-
-          <Text size="sm" c="dimmed">
-            {shift.date} · {shift.startTime} – {shift.endTime}
-            {shift.isOvernight && ' (overnight)'}
-          </Text>
-
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">Headcount</Text>
-            <Text size="sm" fw={700}>{shift.assignedStaff.length} / {shift.headcount}</Text>
-          </Group>
-
-          <Divider color="var(--border-subtle)" />
-
-          <Box>
-            <Text size="xs" c="dimmed" fw={600} tt="uppercase" lts="0.08em" mb={8}>Assigned Staff</Text>
-            {shift.assignedStaff.length === 0 ? (
-              <Text size="sm" c="dimmed">No staff assigned yet</Text>
-            ) : (
-              <Stack gap={6}>
-                {shift.assignedStaff.map(sid => {
-                  const s = staffMap[sid]
-                  if (!s) return null
-                  return (
-                    <Group key={sid} gap={10} align="center" p="xs"
-                      style={{ background: 'var(--bg-card)', borderRadius: 8 }}>
-                      <Avatar size={36} radius="xl" style={{ background: s.avatarColor, color: '#fff', fontSize: 11, fontWeight: 700 }}>
-                        {s.avatarInitials}
-                      </Avatar>
-                      <Text size="sm" fw={600} flex={1}>{s.name}</Text>
-                      <Group gap={4}>
-                        {s.skills.map(sk => {
-                          const sObj = skills.find(apiS => apiS.id === sk)
-                          const sLabel = sObj?.name || sk
-                          const sSlug = sLabel.toLowerCase().replace(' ', '_')
-                          return (
-                            <Badge key={sk} size="xs" variant="light"
-                              style={{ background: `${SKILL_COLORS[sSlug] ?? '#6366f1'}22`, color: SKILL_COLORS[sSlug] ?? '#6366f1' }}>
-                              {sLabel.replace('_', ' ')}
-                            </Badge>
-                          )
-                        })}
-                      </Group>
-                    </Group>
-                  )
-                })}
-              </Stack>
-            )}
-          </Box>
-
-          {msg && (
-            <Text size="sm" c="red" p="sm" style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>{msg}</Text>
-          )}
-
-          {isManager && (
-            <Group gap={8} wrap="wrap" pt={4}>
-              <Button size="sm" loading={loading} onClick={publish} disabled={isLocked}
-                variant="gradient" gradient={{ from: '#6366f1', to: '#4f46e5' }}>
-                {shift.status === 'published' ? '⬆ Unpublish' : '✓ Publish'}
-              </Button>
-              <Button component="a" href={`/shifts/${shift.id}`} size="sm" variant="default">
-                Manage Staff
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => onEdit(shift)} disabled={isLocked}>
-                Edit Shift
-              </Button>
-              <Button size="sm" color="red" variant="light" loading={loading} onClick={() => setShowDeleteConfirm(true)} ml="auto" disabled={isLocked}>
-                Delete
-              </Button>
-            </Group>
-          )}
-        </Stack>
-      )}
-    </Modal>
-    </>
-  )
-}
-
-const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
-  const h = Math.floor(i / 2)
-  const m = i % 2 === 0 ? '00' : '30'
-  const val = `${h.toString().padStart(2, '0')}:${m}`
-  const label = DateTime.fromFormat(val, 'HH:mm').toFormat('hh:mm a')
-  return { value: val, label }
-})
-
-function ShiftFormModal({ opened, locations, onClose, onSaved, defaultDate, initialShift, skills }: {
-  opened: boolean; locations: Location[]; onClose: () => void; onSaved: () => void; defaultDate: string; initialShift?: Partial<Shift> | null; skills: { id: string, name: string }[]
-}) {
+  const [error, setError] = useState<string | null>(null)
+  const [skippedDates, setSkippedDates] = useState<string[]>([])
   const [form, setForm] = useState({
-    locationId: initialShift?.locationId || (locations[0]?.id ?? ''),
-    date: initialShift?.date || defaultDate,
-    startTime: initialShift?.startTime || '10:00',
-    endTime: initialShift?.endTime || '18:00',
-    requiredSkill: initialShift?.requiredSkill || (skills.find(s => s.name === 'Server')?.id || skills[0]?.id || ''),
-    headcount: initialShift?.headcount || 1,
-    notes: initialShift?.notes || '',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    reason: ''
   })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
-  const isOvernight = form.endTime < form.startTime
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const isEdit = !!initialShift?.id
-    const url = isEdit ? `/api/shifts/${initialShift.id}` : '/api/shifts'
-    const method = isEdit ? 'PATCH' : 'POST'
-
-    // Map requiredSkill to ID (it might be name or ID depending on initialShift)
-    const skillObj = skills.find(s => s.id === form.requiredSkill || s.name === form.requiredSkill)
-    const skillId = skillObj?.id || form.requiredSkill
-
-    // Get location timezone
-    const loc = locations.find(l => l.id === form.locationId)
-    const tz = loc?.timezone || 'UTC'
-
-    // Convert local time to UTC
-    const { start, end } = getShiftUTCTimes(form.date, form.startTime, form.endTime, tz)
-
-    const payload = {
-      locationId: form.locationId,
-      skillId,
-      startUtc: start.toISOString(),
-      endUtc: end.toISOString(),
-      headcount: form.headcount,
-      notes: form.notes
-    }
+    setError(null)
+    setSkippedDates([])
     
-    const res = await fetch(url, {
-      method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const d = await res.json()
-    setLoading(false)
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (data.skippedDates) {
+          setSkippedDates(data.skippedDates)
+          setError(data.message)
+        } else {
+          throw new Error(data.message || 'Failed to submit request')
+        }
+        return
+      }
       onSaved()
-    } else {
-      setError(d.message || d.error || 'Failed to save shift')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} title={initialShift?.id ? "Edit Shift" : "Create New Shift"} size="md" radius="lg">
+    <Modal opened={opened} onClose={onClose} title={<Text fw={700}>Request Leave</Text>} radius="lg">
       <form onSubmit={submit}>
         <Stack gap="md">
           <Group grow>
-            <Select
-              label="Location"
-              data={locations.map(l => ({ value: l.id, label: l.shortName }))}
-              value={form.locationId}
-              onChange={v => set('locationId', v ?? '')}
-              required
-            />
-            <TextInput
-              label="Date"
-              type="date"
-              value={form.date}
-              onChange={e => set('date', e.target.value)}
-              required
-            />
+            <TextInput label="Start Date" type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} required />
+            <TextInput label="End Date" type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} required />
           </Group>
-          <Group grow>
-            <Select
-              label="Start Time"
-              data={TIME_OPTIONS}
-              value={form.startTime}
-              onChange={v => set('startTime', v ?? '10:00')}
-              searchable
-              required
-            />
-            <Select
-              label="End Time"
-              data={TIME_OPTIONS}
-              value={form.endTime}
-              onChange={v => set('endTime', v ?? '18:00')}
-              searchable
-              required
-            />
-          </Group>
-          <Group grow>
-            <Select
-              label="Required Skill"
-              data={skills.map(s => ({ value: s.id, label: s.name }))}
-              value={skills.find(s => s.name === form.requiredSkill || s.id === form.requiredSkill)?.id}
-              onChange={v => set('requiredSkill', v ?? (skills[0]?.id || ''))}
-              required
-            />
-            <NumberInput
-              label="Headcount"
-              min={1}
-              max={20}
-              value={form.headcount}
-              onChange={v => set('headcount', v)}
-              required
-            />
-          </Group>
-          <TextInput
-            label="Notes (optional)"
-            placeholder="Any special instructions..."
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-          />
+          <Textarea label="Reason" placeholder="Optional notes for your manager..." value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} maxLength={500} minRows={3} />
 
-          {isOvernight && (
-            <Text size="xs" c="cyan" p="sm" style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)', borderRadius: 8 }}>
-              🌙 Overnight shift detected — ends the following day
-            </Text>
-          )}
           {error && (
-            <Text size="sm" c="red" p="sm" style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>{error}</Text>
+            <Box p="sm" style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>
+              <Text size="sm" c="red" fw={600}>{error}</Text>
+              {skippedDates.length > 0 && (
+                <Stack gap={4} mt={8}>
+                  {skippedDates.map(d => <Text key={d} size="xs" c="red">• {d}</Text>)}
+                </Stack>
+              )}
+            </Box>
+          )}
+
+          {!error && skippedDates.length > 0 && (
+            <Box p="sm" style={{ background: 'rgba(234,179,8,0.1)', borderRadius: 8 }}>
+              <Text size="sm" fw={600} c="yellow.9">Notice</Text>
+              <Text size="xs" mt={4}>{skippedDates.length} day(s) were excluded (past deadline).</Text>
+              <Button fullWidth mt="md" size="xs" variant="light" color="yellow" onClick={onSaved}>Proceed anyway</Button>
+            </Box>
           )}
 
           <Group justify="flex-end" gap={8}>
-            <Button variant="default" onClick={onClose} type="button">Cancel</Button>
-            <Button type="submit" loading={loading} variant="gradient" gradient={{ from: '#6366f1', to: '#4f46e5' }}>
-              {initialShift?.id ? 'Save Changes' : 'Create Shift'}
-            </Button>
+            <Button variant="default" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" loading={loading} variant="gradient" gradient={{ from: '#6366f1', to: '#4f46e5' }} disabled={skippedDates.length > 0}>Submit</Button>
           </Group>
         </Stack>
       </form>
     </Modal>
   )
 }
+
+function ShiftCard({ shift, staffMap, isManager, onClick, skills }: { shift: Shift; staffMap: Record<string, StaffInfo>; isManager: boolean; onClick: () => void; skills: {id: string, name: string}[] }) {
+  const currentSkill = skills.find(s => s.id === shift.requiredSkill)
+  const skillLabel = currentSkill?.name || shift.requiredSkill
+  const color = SKILL_COLORS[skillLabel.toLowerCase().replace(' ', '_')] ?? '#6366f1'
+  const filled = shift.assignedStaff.length
+  const pct = Math.round((filled / shift.headcount) * 100)
+
+  return (
+    <Box onClick={onClick} draggable={isManager}
+      onDragStart={(e) => {
+        if (!isManager) return
+        e.dataTransfer.setData('shiftId', shift.id)
+        e.dataTransfer.setData('locationId', shift.locationId)
+      }}
+      style={{
+        background: `${color}15`, border: `1px solid ${color}30`, borderLeft: `3px solid ${color}`,
+        borderRadius: 7, padding: '6px 8px', cursor: 'pointer', transition: 'all 0.15s',
+      }}
+      onMouseOver={e => (e.currentTarget.style.background = `${color}25`)}
+      onMouseOut={e => (e.currentTarget.style.background = `${color}15`)}
+    >
+      <Group justify="space-between" align="center" gap={4}>
+        <Text size="xs" fw={700} tt="uppercase" lts="0.04em" c={color} truncate>{skillLabel}</Text>
+        <Text size="10px" fw={700} c={color}>{filled}/{shift.headcount}</Text>
+      </Group>
+      <Group gap={4} mt={4}>
+        <Text size="11px" fw={600} c="var(--text-default)">{shift.startTime}–{shift.endTime}</Text>
+        {shift.status === 'draft' && <Badge size="9px" variant="outline" color="gray">DRAFT</Badge>}
+      </Group>
+    </Box>
+  )
+}
+
+function ShiftDetailModal({ shift, staffMap, location, session, skills, onClose, onEdit, onUpdate }: {
+  shift: Shift | null; staffMap: any; location: Location | null; session: Session; skills: any[]
+  onClose: () => void; onEdit: (s: Shift) => void; onUpdate: () => void
+}) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  if (!shift) return null
+
+  async function togglePublish() {
+    if (!shift) return
+    setLoading(true)
+    await fetch(`/api/shifts/${shift.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPublished: shift.status !== 'published' })
+    })
+    setLoading(false)
+    onUpdate()
+  }
+
+  async function deleteShift() {
+    if (!shift) return
+    setLoading(true)
+    await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' })
+    setLoading(false)
+    setShowDeleteConfirm(false)
+    onUpdate()
+  }
+
+  const isManager = session.user.role !== 'staff'
+  const isLocked = new Date() > new Date(new Date(shift.startUtc).getTime() - (shift.editCutoffHours || 48) * 3600000)
+
+  return (
+    <>
+    <Modal opened={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete" size="sm" radius="md" centered zIndex={3000}>
+      <Text size="sm">Are you sure you want to delete this shift? This cannot be undone.</Text>
+      <Group justify="flex-end" mt="md"><Button variant="default" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button><Button color="red" onClick={deleteShift} loading={loading}>Delete</Button></Group>
+    </Modal>
+    <Modal opened={!!shift} onClose={onClose} title={location?.shortName ?? 'Shift Detail'} size="md" radius="lg">
+      <Stack gap="lg">
+        <Group justify="space-between" align="flex-start">
+          <Box>
+            <Title order={3} size={20}>{skills.find((s:any) => s.id === shift.requiredSkill)?.name || shift.requiredSkill}</Title>
+            <Text size="sm" c="dimmed">{new Date(shift.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+          </Box>
+          <Badge size="lg" variant="dot" color={shift.status === 'published' ? 'green' : 'gray'}>{shift.status}</Badge>
+        </Group>
+        <Paper p="md" radius="md" withBorder style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <Group grow>
+            <Box><Text size="xs" c="dimmed" tt="uppercase" fw={700}>Time</Text><Text fw={600}>{shift.startTime} – {shift.endTime}</Text></Box>
+            <Box><Text size="xs" c="dimmed" tt="uppercase" fw={700}>Staffing</Text><Text fw={600}>{shift.assignedStaff.length} / {shift.headcount} filled</Text></Box>
+          </Group>
+        </Paper>
+        <Box>
+          <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={8}>Assigned Staff</Text>
+          <Stack gap={8}>
+            {shift.assignedStaff.map((sid: string) => {
+              const u = staffMap[sid]
+              return (
+                <Group key={sid} gap={10} p={8} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                  <Avatar size={24} radius="xl" style={{ background: u?.avatarColor }}>{u?.avatarInitials}</Avatar>
+                  <Text size="sm" fw={500}>{u?.name || 'Unknown'}</Text>
+                </Group>
+              )
+            })}
+            {shift.assignedStaff.length === 0 && <Text size="sm" c="dimmed" fs="italic">No staff assigned yet</Text>}
+          </Stack>
+        </Box>
+        {isLocked && (
+          <Box p="xs" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}>
+            <Text size="xs" c="red" fw={600} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 14, height: 14}}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+              Shift is locked (past edit cutoff)
+            </Text>
+          </Box>
+        )}
+        {isManager && (
+          <Stack gap={8}>
+            <Group grow gap={8}>
+              <Button variant="default" onClick={() => onEdit(shift)} disabled={isLocked}>Edit Details</Button>
+              <Button variant="default" onClick={() => { onClose(); router.push(`/shifts/${shift.id}`) }}>Manage Staff</Button>
+            </Group>
+            <Group grow gap={8}>
+              <Button variant="light" color={shift.status === 'published' ? 'gray' : 'green'} onClick={togglePublish} loading={loading} disabled={isLocked}>
+                {shift.status === 'published' ? 'Unpublish' : 'Publish Now'}
+              </Button>
+              <Button variant="subtle" color="red" onClick={() => setShowDeleteConfirm(true)} disabled={isLocked}>Delete</Button>
+            </Group>
+          </Stack>
+        )}
+      </Stack>
+    </Modal>
+    </>
+  )
+}
+
+function MyLeaveModal({ opened, onClose, leaveRequests, onUpdated }: { opened: boolean; onClose: () => void; leaveRequests: any[]; onUpdated: () => void }) {
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const handleCancel = async (id: string) => {
+    setLoading(id)
+    try {
+      await fetch(`/api/leave/${id}/cancel`, { method: 'POST' })
+      onUpdated()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={<Text fw={700}>My Leave Requests</Text>} radius="md" size="md">
+      {leaveRequests.length === 0 ? (
+        <Text size="sm" c="dimmed" py="xl" ta="center">You haven't requested any leave yet.</Text>
+      ) : (
+        <Stack gap="md">
+          {leaveRequests.map(lr => (
+            <Paper key={lr.id} withBorder p="md" radius="md">
+              <Group justify="space-between" align="flex-start">
+                <Box>
+                  <Text fw={700} size="sm">{lr.startDate} – {lr.endDate}</Text>
+                  <Text size="xs" c="dimmed" mt={2}>{lr.reason || 'No reason provided'}</Text>
+                </Box>
+                <Badge color={lr.status === 'APPROVED' ? 'green' : lr.status === 'REJECTED' ? 'red' : lr.status === 'CANCELLED' ? 'gray' : 'blue'}>
+                  {lr.status}
+                </Badge>
+              </Group>
+              {lr.status === 'PENDING' && (
+                <Group justify="flex-end" mt="md">
+                  <Button size="xs" color="red" variant="light" onClick={() => handleCancel(lr.id)} loading={loading === lr.id}>
+                    Cancel Request
+                  </Button>
+                </Group>
+              )}
+            </Paper>
+          ))}
+        </Stack>
+      )}
+    </Modal>
+  )
+}
+
+

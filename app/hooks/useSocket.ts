@@ -32,6 +32,9 @@ export function useSocket(
     if (!session?.accessToken) return;
 
     const socket = getSocket(session.accessToken)
+    
+    // Authenticate
+    socket.emit('authenticate', { token: session.accessToken })
 
     // Listen to all ShiftSync events
     const events: SocketEvent[] = [
@@ -39,6 +42,8 @@ export function useSocket(
       'swap_requested', 'swap_accepted', 'swap_rejected', 'swap_approved', 'swap_cancelled',
       'drop_claimed', 'overtime_warning', 'availability_changed', 'conflict_detected',
       'shift_updated',
+      'LEAVE_REQUESTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED', 'LEAVE_SHIFT_UNASSIGNED',
+      'MANAGER_ASSIGNED', 'SKILL_ADDED', 'LOCATION_CERTIFIED',
     ]
 
     const handler = (payload: any) => {

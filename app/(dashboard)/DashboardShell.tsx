@@ -59,9 +59,26 @@ const ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
     </svg>
   ),
+  locations: (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5" style={{ width: 20, height: 20 }}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+    </svg>
+  ),
 }
 
-const NAV = [
+const ADMIN_NAV = [
+  { href: '/dashboard', icon: ICONS.dashboard, label: 'Dashboard' },
+  { href: '/schedule', icon: ICONS.schedule, label: 'Schedule' },
+  { href: '/shifts', icon: ICONS.shifts, label: 'Shifts' },
+  { href: '/staff', icon: ICONS.staff, label: 'Staff' },
+  { href: '/locations', icon: ICONS.locations, label: 'Locations' },
+  { href: '/swaps', icon: ICONS.swaps, label: 'Swaps' },
+  { href: '/analytics', icon: ICONS.analytics, label: 'Analytics' },
+  { href: '/notifications', icon: ICONS.notifications, label: 'Notifications' },
+]
+
+const MANAGER_NAV = [
   { href: '/dashboard', icon: ICONS.dashboard, label: 'Dashboard' },
   { href: '/schedule', icon: ICONS.schedule, label: 'Schedule' },
   { href: '/shifts', icon: ICONS.shifts, label: 'Shifts' },
@@ -85,13 +102,34 @@ export function DashboardShell({ session, children }: { session: Session; childr
   const [opened, { toggle }] = useDisclosure()
   const { toggleColorScheme, colorScheme } = useMantineColorScheme()
 
-  const navItems = session.user.role === 'staff' ? STAFF_NAV : NAV
+  const navItems = session.user.role === 'admin' 
+    ? ADMIN_NAV 
+    : session.user.role === 'manager' 
+      ? MANAGER_NAV 
+      : STAFF_NAV
+
+  // Diagnostic log for debugging "frozen" state
+  useEffect(() => {
+    console.log('[DashboardShell] Initialized for user:', session?.user?.email)
+    if (!session?.accessToken) {
+      console.warn('[DashboardShell] No access token in session!')
+    }
+  }, [session])
 
   // Fetch unread notification count
   useEffect(() => {
-    fetch('/api/notifications').then(r => r.json()).then(d => {
-      if (d.success) setUnread(d.unread)
-    })
+    fetch('/api/notifications')
+      .then(r => {
+        if (r.status === 401) {
+          window.location.href = '/logout'
+          return null
+        }
+        return r.json()
+      })
+      .then(d => {
+        if (d && d.success) setUnread(d.unread)
+      })
+      .catch(err => console.error('[DashboardShell] Notifications fetch error:', err))
   }, [pathname])
 
   // Real-time Socket.io events → Mantine toast notifications
@@ -101,20 +139,36 @@ export function DashboardShell({ session, children }: { session: Session; childr
       schedule_published: 'green', swap_requested: 'blue', swap_accepted: 'cyan',
       swap_rejected: 'red', swap_approved: 'green', swap_cancelled: 'gray',
       drop_claimed: 'teal', overtime_warning: 'orange', conflict_detected: 'red',
+      LEAVE_REQUESTED: 'indigo', LEAVE_APPROVED: 'green', LEAVE_REJECTED: 'red',
+      LEAVE_CANCELLED: 'gray', LEAVE_SHIFT_UNASSIGNED: 'orange',
+      MANAGER_ASSIGNED: 'indigo', SKILL_ADDED: 'teal', LOCATION_CERTIFIED: 'blue',
     }
     const userFacingEvents = new Set([
       'shift_assigned', 'shift_changed', 'shift_cancelled', 'schedule_published',
       'swap_requested', 'swap_accepted', 'swap_rejected', 'swap_approved', 'swap_cancelled',
-      'drop_claimed', 'overtime_warning', 'conflict_detected',
+      'drop_claimed', 'overtime_warning', 'availability_changed', 'conflict_detected',
+      'shift_updated',
+      'LEAVE_REQUESTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED', 'LEAVE_SHIFT_UNASSIGNED',
+      'MANAGER_ASSIGNED', 'SKILL_ADDED', 'LOCATION_CERTIFIED',
     ])
     if (userFacingEvents.has(event)) {
       setUnread(n => n + 1)
       notifications.show({
-        title: payload.title,
-        message: payload.message,
+        title: payload.title || 'Notification',
+        message: payload.message || 'New update available',
         color: COLOR_MAP[event] ?? 'indigo',
         autoClose: 5000,
       })
+      
+      // Refresh the page data if it's a schedule, leave or profile related event
+      if (
+        event.startsWith('LEAVE_') || 
+        event.startsWith('shift_') || 
+        event === 'schedule_published' ||
+        ['MANAGER_ASSIGNED', 'SKILL_ADDED', 'LOCATION_CERTIFIED'].includes(event)
+      ) {
+        router.refresh()
+      }
     }
   })
 

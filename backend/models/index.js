@@ -16,6 +16,7 @@ import RefreshTokenFactory from './RefreshToken.js';
 import NotificationFactory from './Notification.js';
 import AuditLogFactory from './AuditLog.js';
 import ReportingHistoryFactory from './ReportingHistory.js';
+import LeaveRequestFactory from './LeaveRequest.js';
 
 const env = process.env.NODE_ENV || 'development';
 const config = databaseConfig[env];
@@ -37,6 +38,7 @@ const RefreshToken = RefreshTokenFactory(sequelize);
 const Notification = NotificationFactory(sequelize);
 const AuditLog = AuditLogFactory(sequelize);
 const ReportingHistory = ReportingHistoryFactory(sequelize);
+const LeaveRequest = LeaveRequestFactory(sequelize);
 
 // --- Associations ---
 
@@ -49,6 +51,13 @@ ReportingHistory.belongsTo(User, { foreignKey: 'staffId', as: 'staff' });
 ReportingHistory.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
 ReportingHistory.belongsTo(User, { foreignKey: 'assignedById', as: 'assignedBy' });
 User.hasMany(ReportingHistory, { foreignKey: 'staffId', as: 'reportingHistory' });
+
+// LeaveRequest
+LeaveRequest.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+LeaveRequest.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
+LeaveRequest.hasMany(AvailabilityException, { foreignKey: 'leaveRequestId', as: 'blockedDays' });
+AvailabilityException.belongsTo(LeaveRequest, { foreignKey: 'leaveRequestId', as: 'leaveRequest' });
+User.hasMany(LeaveRequest, { foreignKey: 'userId', as: 'leaveRequests' });
 
 // User <-> Location (Certification)
 User.belongsToMany(Location, { through: UserLocation, foreignKey: 'userId', as: 'certifiedLocations' });
@@ -134,4 +143,5 @@ export {
   Notification,
   AuditLog,
   ReportingHistory,
+  LeaveRequest,
 };

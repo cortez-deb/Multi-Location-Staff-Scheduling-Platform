@@ -28,6 +28,19 @@ export async function createSwap(req, res, next) {
       return res.status(400).json({ error: 'LIMIT_EXCEEDED', message: 'Maximum 3 pending requests allowed' });
     }
 
+    // Prevent duplicate request for same shift
+    const existing = await SwapRequest.findOne({
+      where: {
+        shiftId,
+        requesterId,
+        status: { [Op.in]: ['PENDING_ACCEPT', 'PENDING_MANAGER'] }
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'DUPLICATE_REQUEST', message: 'You already have a pending request for this shift' });
+    }
+
     const isDrop = !targetId;
     const status = isDrop ? 'PENDING_ACCEPT' : 'PENDING_ACCEPT'; // Always PENDING_ACCEPT initially
 
@@ -113,6 +126,22 @@ export async function acceptSwap(req, res, next) {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Not authorized to accept this swap' });
     }
 
+    // Qualification check
+    const { UserSkill, UserLocation } = await import('../models/index.js');
+    const shift = await Shift.findByPk(swap.shiftId);
+    
+    const [hasSkill, isCertified] = await Promise.all([
+      UserSkill.findOne({ where: { userId: req.user.userId, skillId: shift.skillId } }),
+      UserLocation.findOne({ where: { userId: req.user.userId, locationId: shift.locationId } })
+    ]);
+
+    if (!hasSkill) {
+      return res.status(403).json({ error: 'NOT_QUALIFIED', message: 'You do not have the required skill for this shift' });
+    }
+    if (!isCertified) {
+      return res.status(403).json({ error: 'NOT_QUALIFIED', message: 'You are not certified for this location' });
+    }
+
     const before = swap.toJSON();
     swap.status = 'PENDING_MANAGER';
     if (!swap.targetId) {
@@ -140,7 +169,8 @@ export async function approveSwap(req, res, next) {
     const swap = await SwapRequest.findByPk(req.params.id);
     if (!swap) return res.status(404).json({ error: 'NOT_FOUND', message: 'Swap request not found' });
 
-    if (swap.status !== 'PENDING_MANAGER') {
+    const isDirectDropApproval = swap.status === 'PENDING_ACCEPT' && !swap.targetId;
+    if (swap.status !== 'PENDING_MANAGER' && !isDirectDropApproval) {
       return res.status(400).json({ error: 'INVALID_TRANSITION', message: `Cannot approve swap from status ${swap.status}` });
     }
 
@@ -157,20 +187,26 @@ export async function approveSwap(req, res, next) {
       await requesterAssignment.save();
     }
 
-    await ShiftAssignment.create({
-      shiftId: swap.shiftId,
-      userId: swap.targetId,
-      status: 'assigned'
-    });
+    if (swap.targetId) {
+      await ShiftAssignment.create({
+        shiftId: swap.shiftId,
+        userId: swap.targetId,
+        status: 'assigned'
+      });
+    }
 
     const io = getIO();
     await logAudit(req.user.userId, 'SwapRequest', swap.id, 'SWAP_APPROVED', before, swap.toJSON());
 
     await notify(swap.requesterId, 'SWAP_APPROVED', 'Your swap request was approved.', { swapRequestId: swap.id }, io);
-    await notify(swap.targetId, 'SWAP_APPROVED', 'A swap request you accepted was approved.', { swapRequestId: swap.id }, io);
+    if (swap.targetId) {
+      await notify(swap.targetId, 'SWAP_APPROVED', 'A swap request you accepted was approved.', { swapRequestId: swap.id }, io);
+    }
 
     io.to(`user:${swap.requesterId}`).emit('swap:statusChanged', { swapRequestId: swap.id, newStatus: swap.status });
-    io.to(`user:${swap.targetId}`).emit('swap:statusChanged', { swapRequestId: swap.id, newStatus: swap.status });
+    if (swap.targetId) {
+      io.to(`user:${swap.targetId}`).emit('swap:statusChanged', { swapRequestId: swap.id, newStatus: swap.status });
+    }
 
     res.json(swap);
   } catch (err) {

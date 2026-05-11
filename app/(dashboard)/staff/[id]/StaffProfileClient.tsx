@@ -26,6 +26,16 @@ export function StaffProfileClient({ session, user, locations, availability, rec
     setSaving(false); router.refresh()
   }
 
+  async function toggleSunday(enabled: boolean, startTime: string = '00:00', endTime: string = '23:59') {
+    setSaving(true)
+    await fetch(`/api/users/${user.id}/availability/sunday`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, startTime, endTime })
+    })
+    setSaving(false); router.refresh()
+  }
+
   async function addException(date: string, available: boolean, reason: string) {
     setSaving(true); setMsg('')
     const res = await fetch(`/api/staff/${user.id}/availability`, {
@@ -100,6 +110,30 @@ export function StaffProfileClient({ session, user, locations, availability, rec
                 </div>
               )
             })}
+          </div>
+
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Sunday Availability</div>
+              {canEdit && (
+                <button 
+                  className={`btn btn-sm ${availability.recurring.find(a => a.dayOfWeek === 0) ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={() => toggleSunday(!availability.recurring.find(a => a.dayOfWeek === 0))}
+                  disabled={saving}
+                >
+                  {availability.recurring.find(a => a.dayOfWeek === 0) ? 'Opt-out' : 'Opt-in'}
+                </button>
+              )}
+            </div>
+            {availability.recurring.find(a => a.dayOfWeek === 0) ? (
+              <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                Available: {availability.recurring.find(a => a.dayOfWeek === 0)?.startTime} – {availability.recurring.find(a => a.dayOfWeek === 0)?.endTime}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                Opted out of Sunday shifts by default.
+              </div>
+            )}
           </div>
         </div>
 

@@ -10,8 +10,9 @@ export function extractLocalDayAndTime(luxonDt) {
   // Luxon weekday is 1-7 (Mon-Sun). We want 0-6 (Sun-Sat).
   const luxonWeekday = luxonDt.weekday;
   const dayOfWeek = luxonWeekday === 7 ? 0 : luxonWeekday;
+  const dayName = luxonDt.weekdayLong;
   const timeString = luxonDt.toFormat('HH:mm');
-  return { dayOfWeek, timeString };
+  return { dayOfWeek, dayName, timeString };
 }
 
 // Check if shift (startUtc, endUtc as ISO strings) falls within availability window
