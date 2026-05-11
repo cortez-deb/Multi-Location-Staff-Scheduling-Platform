@@ -8,7 +8,12 @@ const SKILL_COLORS: Record<string, string> = {
   host: '#34d399', supervisor: '#fbbf24', expo: '#fb7185', busser: '#94a3b8',
 }
 
-import { Modal, Button, Group, Stack, Text, Title, Badge, Paper, Box } from '@mantine/core'
+import Link from 'next/link'
+import { 
+  Modal, Button, Group, Stack, Text, Title, Badge, Paper, Box,
+  Grid, SimpleGrid, Divider, Alert, Timeline, Progress, Avatar,
+  ThemeIcon, TextInput, Container, Tooltip, Flex
+} from '@mantine/core'
 import { ShiftFormModal } from '@/app/components/ShiftFormModal'
 
 type SafeUser = { id: string; name: string; email: string; skills: string[]; certifiedLocations: string[]; avatarInitials: string; avatarColor: string }
@@ -111,16 +116,18 @@ export function ShiftDetailClient({ session, shift, location, locations, allStaf
 
   const currentSkill = apiSkills?.find(s => s.id === shift.requiredSkill)
   const skillLabel = currentSkill?.name || shift.requiredSkill
-  const skillSlug = (currentSkill?.name || shift.requiredSkill).toLowerCase().replace(' ', '_')
+  const skillSlug = (currentSkill?.name || shift.requiredSkill || 'staff').toLowerCase().replace(' ', '_')
 
   return (
-    <div style={{ padding: '28px 32px 40px', maxWidth: 1000, margin: '0 auto' }}>
-      <Modal opened={showDelete} onClose={() => setShowDelete(false)} title="Confirm Delete" size="sm" radius="md" centered>
-        <Text size="sm" mb="md">Are you sure you want to delete this shift? This cannot be undone.</Text>
-        <Group justify="flex-end">
-          <Button variant="default" onClick={() => setShowDelete(false)}>Cancel</Button>
-          <Button color="red" onClick={deleteShift} loading={loading}>Delete</Button>
-        </Group>
+    <Box p={{ base: 16, sm: 32 }} pb={60} maw={1100} mx="auto">
+      <Modal opened={showDelete} onClose={() => setShowDelete(false)} title={<Text fw={700}>Confirm Delete</Text>} size="sm" radius="md" centered>
+        <Stack gap="md">
+          <Text size="sm">Are you sure you want to delete this shift? This action cannot be undone and will notify all assigned staff.</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setShowDelete(false)}>Cancel</Button>
+            <Button color="red" onClick={deleteShift} loading={loading}>Delete Shift</Button>
+          </Group>
+        </Stack>
       </Modal>
 
       <ShiftFormModal
@@ -132,225 +139,325 @@ export function ShiftDetailClient({ session, shift, location, locations, allStaf
         skills={apiSkills}
       />
 
-      {/* Back */}
-      <a href="/shifts" style={{ color: 'var(--color-text-muted)', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>← Back to Shifts</a>
+      {/* Navigation */}
+      <Button 
+        component={Link} 
+        href="/shifts" 
+        variant="subtle" 
+        color="gray" 
+        leftSection={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 14, height: 14}}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>}
+        size="xs"
+        mb={20}
+        px={0}
+      >
+        Back to Shifts
+      </Button>
 
-      {/* Header */}
-      <div className="card" style={{ marginBottom: 24, padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <Badge color={SKILL_COLORS[skillSlug] ?? 'indigo'} variant="filled" size="lg" radius="sm">{skillLabel}</Badge>
-              <Badge color={shift.status === 'published' ? 'green' : 'gray'} variant="dot" size="lg">{shift.status}</Badge>
-              {shift.isPremium && <Badge color="orange" variant="light">⭐ Premium</Badge>}
-              {shift.isOvernight && <Badge color="cyan" variant="light">🌙 Overnight</Badge>}
-              {isLocked && <Badge color="red" variant="filled" leftSection={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 12, height: 12}}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>}>Locked</Badge>}
-            </div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>{location.shortName}</h1>
-            <Text c="dimmed" size="sm" mt={4} fw={500}>
-              {shift.date} · {shift.startTime}–{shift.endTime} · {location.timezone}
-            </Text>
-            <Text c="dimmed" size="xs" mt={2}>{location.address}</Text>
-            
-            {shift.notes && (
-              <Paper mt={16} p="md" radius="md" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <Text size="10px" fw={700} tt="uppercase" c="dimmed" mb={4} lts="0.05em">Manager Notes</Text>
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{shift.notes}</Text>
-              </Paper>
-            )}
-          </div>
+      {/* Main Grid */}
+      <Stack gap={24}>
+        {/* Top Header Card */}
+        <Paper p={{ base: 20, sm: 32 }} radius="lg" withBorder className="glass" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <Stack gap={24}>
+              <Group justify="space-between" align="flex-start" wrap="wrap" gap={20}>
+                <Box style={{ flex: 1, minWidth: 280 }}>
+                <Group gap={8} mb={16}>
+                  <Badge 
+                    color={SKILL_COLORS[skillSlug] ?? 'indigo'} 
+                    variant="filled" 
+                    radius="sm" 
+                    size="md"
+                    style={{ textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}
+                  >
+                    {skillLabel}
+                  </Badge>
+                  <Badge 
+                    color={shift.status === 'published' ? 'green' : 'gray'} 
+                    variant="light" 
+                    size="md"
+                  >
+                    {shift.status === 'published' ? '● Published' : '○ Draft'}
+                  </Badge>
+                  {shift.isPremium && <Badge color="orange" variant="light" size="md">⭐ Premium</Badge>}
+                  {isLocked && (
+                    <Badge color="red" variant="filled" size="md" leftSection={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 12, height: 12}}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>}>
+                      Locked
+                    </Badge>
+                  )}
+                </Group>
 
-          {isManager && (
-            <Stack gap={10} style={{ minWidth: 200 }}>
-              {isLocked && (
-                <Text size="xs" c="red" fw={600} style={{ textAlign: 'right' }}>Locked (Past edit cutoff)</Text>
-              )}
-              <Group grow gap={8}>
-                <Button variant="default" onClick={() => setShowEdit(true)} disabled={isLocked}>Edit</Button>
-                <Button variant="light" color={shift.status === 'published' ? 'gray' : 'green'} onClick={togglePublish} loading={loading} disabled={isLocked}>
-                  {shift.status === 'published' ? 'Unpublish' : 'Publish'}
-                </Button>
-              </Group>
-              <Button variant="subtle" color="red" fullWidth onClick={() => setShowDelete(true)} disabled={isLocked}>Delete Shift</Button>
-            </Stack>
-          )}
-        </div>
-
-        <div className="divider" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Headcount</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: isFull ? '#10b981' : 'var(--color-text-primary)' }}>
-              {shift.assignedStaff.length} / {shift.headcount}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Edit Cutoff</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{shift.editCutoffHours ? `${shift.editCutoffHours}h before shift` : 'Not set'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Created By</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{performerMap[shift.createdBy] ?? shift.createdBy}</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-        {/* Assigned Staff */}
-        <div className="card">
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
-            Assigned Staff ({shift.assignedStaff.length}/{shift.headcount})
-          </h2>
-          {shift.assignedStaff.length === 0 ? (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No staff assigned yet</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {shift.assignedStaff.map(sid => {
-                const s = allStaff.find(u => u.id === sid)
-                if (!s) return null
-                return (
-                  <div key={sid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 8 }}>
-                    <div className="avatar" style={{ background: s.avatarColor, color: '#fff', fontSize: 12 }}>{s.avatarInitials}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
-                      <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-                        {s.skills.map(sk => {
-                          const sObj = apiSkills?.find(apiS => apiS.id === sk)
-                          const sLabel = sObj?.name || sk
-                          const sSlug = sLabel.toLowerCase().replace(' ', '_')
-                          return <span key={sk} className={`badge skill-${sSlug}`} style={{ fontSize: 9 }}>{sLabel}</span>
-                        })}
-                      </div>
-                    </div>
-                    {isManager && (
-                      <button className="btn btn-sm" onClick={() => unassign(sid)} disabled={loading || isLocked} style={{ color: '#ef4444', opacity: isLocked ? 0.5 : 1 }}>
-                        Unassign
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Add Staff */}
-        {isManager && !isFull && (
-          <div className="card" style={{ opacity: isLocked ? 0.7 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
-              {isLocked ? 'Staff Assigned' : 'Add Staff'}
-            </h2>
-            
-            {!isLocked && (
-              <Box mb={16}>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    className="input" 
-                    placeholder="Search by name or email..." 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{ paddingLeft: 36, fontSize: 13 }}
-                  />
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ position: 'absolute', left: 12, top: 10, width: 16, height: 16, color: 'var(--color-text-muted)' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                  </svg>
-                </div>
+                <Title order={1} size={32} fw={900} lts="-0.03em">{location.shortName}</Title>
+                
+                <Group gap={16} mt={8} wrap="wrap">
+                  <Group gap={6}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 18, height: 18, color: 'var(--mantine-color-dimmed)'}}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                    <Text size="sm" fw={600}>{shift.date}</Text>
+                  </Group>
+                  <Group gap={6}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 18, height: 18, color: 'var(--mantine-color-dimmed)'}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    <Text size="sm" fw={600}>{shift.startTime} – {shift.endTime}</Text>
+                  </Group>
+                  <Group gap={6}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 18, height: 18, color: 'var(--mantine-color-dimmed)'}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-.778.099-1.533.284-2.253" /></svg>
+                    <Text size="xs" c="dimmed">{location.timezone}</Text>
+                  </Group>
+                </Group>
               </Box>
-            )}
 
-            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
-              {isLocked ? 'Assignment is locked for this shift.' : `Showing ${suggestions.length} eligible (${skillLabel} + certified)`}
-            </p>
-
-            {/* Violation messages */}
-            {violations.map((v, i) => (
-              <div key={i} style={{ padding: '10px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, marginBottom: 8, fontSize: 13 }}>
-                <strong style={{ color: '#ef4444' }}>⚠ {v.message}</strong>
-                <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 12 }}>{v.detail}</p>
-                {v.suggestions?.length > 0 && (
-                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#10b981' }}>
-                    Suggested: {v.suggestions.map((s: any) => s.name).join(', ')}
-                  </p>
-                )}
-              </div>
-            ))}
-            {warnings.map((v, i) => (
-              <div key={i} style={{ padding: '8px 12px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, marginBottom: 8, fontSize: 12, color: '#f59e0b' }}>
-                ⚠ {v.message} — {v.detail}
-              </div>
-            ))}
-
-            {/* Override form */}
-            {pendingAssign && (
-              <div style={{ marginBottom: 12, padding: '12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8 }}>
-                <p style={{ fontSize: 13, color: '#ef4444', marginBottom: 8 }}>Override reason required:</p>
-                <input className="input" style={{ marginBottom: 8 }} placeholder="Document your reason…" value={overrideReason} onChange={e => setOverrideReason(e.target.value)} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-danger btn-sm" onClick={() => assign(pendingAssign, overrideReason)} disabled={!overrideReason || loading}>
-                    Confirm Override
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setPendingAssign(null); setViolations([]) }}>Cancel</button>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', position: 'relative' }}>
-              {fetchingSuggestions && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                  <Text size="xs" c="dimmed">Searching...</Text>
-                </div>
+              {isManager && (
+                <Stack w={{ base: '100%', sm: 'auto' }} style={{ minWidth: 220 }}>
+                  <Flex direction="column" gap={10} align={{ base: 'stretch', sm: 'flex-end' }}>
+                    {isLocked && <Text size="xs" c="red" fw={700} ta={{ base: 'center', sm: 'right' }}>Locked for editing</Text>}
+                    <Group gap={8} wrap="nowrap" w="100%">
+                      <Button variant="default" onClick={() => setShowEdit(true)} disabled={isLocked} flex={1}>Edit</Button>
+                      <Button 
+                        variant="light" 
+                        color={shift.status === 'published' ? 'gray' : 'green'} 
+                        onClick={togglePublish} 
+                        loading={loading} 
+                        disabled={isLocked}
+                        flex={1.5}
+                      >
+                        {shift.status === 'published' ? 'Unpublish' : 'Publish'}
+                      </Button>
+                    </Group>
+                    <Button variant="subtle" color="red" size="xs" onClick={() => setShowDelete(true)} disabled={isLocked} fullWidth>
+                      Delete Shift
+                    </Button>
+                  </Flex>
+                </Stack>
               )}
-              {suggestions.map(s => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 8 }}>
-                  <div className="avatar" style={{ background: s.avatarColor, color: '#fff', fontSize: 11, width: 30, height: 30 }}>{s.avatarInitials}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{s.email}</div>
-                  </div>
-                  <button className="btn btn-primary btn-sm" onClick={() => assign(s.id)} disabled={loading}>+ Assign</button>
-                </div>
+              </Group>
+
+              {shift.notes && (
+                <Paper p="md" radius="md" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4} lts="0.05em">Manager Notes</Text>
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{shift.notes}</Text>
+                </Paper>
+              )}
+            </Stack>
+
+          <Divider my={24} style={{ opacity: 0.1 }} />
+
+          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={32}>
+            <Box>
+              <Group justify="space-between" mb={8}>
+                <Text size="xs" fw={700} tt="uppercase" c="dimmed" lts="0.05em">Headcount</Text>
+                <Text size="sm" fw={800} c={isFull ? 'green' : undefined}>{shift.assignedStaff.length} / {shift.headcount}</Text>
+              </Group>
+              <Progress value={(shift.assignedStaff.length / shift.headcount) * 100} color={isFull ? 'green' : 'indigo'} size="sm" radius="xl" />
+            </Box>
+
+            <Box>
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed" lts="0.05em" mb={4}>Edit Cutoff</Text>
+              <Group gap={8}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: 16, height: 16, color: 'var(--mantine-color-orange-filled)'}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                <Text size="sm" fw={700}>{shift.editCutoffHours ? `${shift.editCutoffHours}h before start` : 'No cutoff set'}</Text>
+              </Group>
+            </Box>
+
+            <Box>
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed" lts="0.05em" mb={4}>Created By</Text>
+              <Group gap={8}>
+                <Avatar size={20} radius="xl" color="indigo" variant="filled">
+                  {(performerMap[shift.createdBy] || shift.createdBy || '?').charAt(0)}
+                </Avatar>
+                <Text size="sm" fw={700}>{performerMap[shift.createdBy] ?? shift.createdBy}</Text>
+              </Group>
+            </Box>
+          </SimpleGrid>
+        </Paper>
+
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 5 }}>
+            <Paper p="xl" radius="lg" withBorder style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
+              <Group justify="space-between" mb={20}>
+                <Title order={3} size={18} fw={800}>Assigned Staff</Title>
+                <Badge variant="light" size="sm">{shift.assignedStaff.length} members</Badge>
+              </Group>
+              
+              {shift.assignedStaff.length === 0 ? (
+                <Box py={40} ta="center">
+                  <Text size="sm" c="dimmed">No staff assigned to this shift yet.</Text>
+                </Box>
+              ) : (
+                <Stack gap={12}>
+                  {shift.assignedStaff.map(sid => {
+                    const s = allStaff.find(u => u.id === sid)
+                    if (!s) return null
+                    return (
+                      <Paper key={sid} p="sm" radius="md" withBorder style={{ background: 'var(--bg-card)', borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <Group gap={12} wrap="nowrap">
+                          <Avatar size={36} radius="xl" style={{ background: s.avatarColor, color: '#fff', fontSize: 12, fontWeight: 700 }}>
+                            {s.avatarInitials}
+                          </Avatar>
+                          <Box style={{ flex: 1 }}>
+                            <Text size="sm" fw={700}>{s.name}</Text>
+                            <Group gap={4} mt={2}>
+                              {s.skills.slice(0, 2).map(sk => {
+                                const sObj = apiSkills?.find(apiS => apiS.id === sk)
+                                const sLabel = sObj?.name || sk
+                                return (
+                                  <Badge key={sk} size="xs" variant="outline" style={{ fontSize: 9, height: 16 }}>{sLabel}</Badge>
+                                )
+                              })}
+                              {s.skills.length > 2 && <Text size="10px" c="dimmed">+{s.skills.length - 2} more</Text>}
+                            </Group>
+                          </Box>
+                          {isManager && (
+                            <Button 
+                              size="compact-xs" 
+                              variant="subtle" 
+                              color="red" 
+                              onClick={() => unassign(sid)} 
+                              disabled={loading || isLocked}
+                            >
+                              Unassign
+                            </Button>
+                          )}
+                        </Group>
+                      </Paper>
+                    )
+                  })}
+                </Stack>
+              )}
+            </Paper>
+          </Grid.Col>
+
+          <Grid.Col span={{ base: 12, md: 7 }}>
+            <Paper p="xl" radius="lg" withBorder style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <Title order={3} size={18} fw={800} mb={20}>
+                {isLocked ? 'Staffing Summary' : 'Add Qualified Staff'}
+              </Title>
+
+              {!isLocked && !isFull ? (
+                <Stack gap={16}>
+                  <Box pos="relative">
+                    <TextInput 
+                      placeholder="Search by name or email..." 
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      leftSection={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: 16, height: 16 }}><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>}
+                      radius="md"
+                    />
+                  </Box>
+
+                  <Text size="xs" c="dimmed" fw={600}>
+                    {fetchingSuggestions ? 'Searching qualified staff...' : `Found ${suggestions.length} eligible members (${skillLabel})`}
+                  </Text>
+
+                  {/* Violation messages */}
+                  {violations.map((v, i) => (
+                    <Alert key={i} color="red" radius="md" title="Constraint Violation" icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 20, height: 20}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>}>
+                      <Text size="sm" fw={700}>{v.message}</Text>
+                      {v.suggestions?.length > 0 && (
+                        <Text size="xs" mt={4} c="green" fw={600}>
+                          Suggested: {v.suggestions.map((s: any) => s.name).join(', ')}
+                        </Text>
+                      )}
+                    </Alert>
+                  ))}
+
+                  {/* Override form */}
+                  {pendingAssign && (
+                    <Paper p="md" radius="md" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <Text size="sm" fw={700} c="red" mb={8}>Documented Reason Required</Text>
+                      <TextInput 
+                        placeholder="Why is this assignment necessary?" 
+                        value={overrideReason} 
+                        onChange={e => setOverrideReason(e.currentTarget.value)} 
+                        mb={12}
+                        radius="md"
+                      />
+                      <Group gap={8}>
+                        <Button color="red" size="xs" onClick={() => assign(pendingAssign, overrideReason)} disabled={!overrideReason || loading}>
+                          Confirm Override
+                        </Button>
+                        <Button variant="subtle" color="gray" size="xs" onClick={() => { setPendingAssign(null); setViolations([]) }}>Cancel</Button>
+                      </Group>
+                    </Paper>
+                  )}
+
+                  <Stack gap={8} style={{ maxHeight: 400, overflowY: 'auto' }}>
+                    {suggestions.map(s => (
+                      <Paper key={s.id} p="sm" radius="md" withBorder style={{ background: 'rgba(255,255,255,0.01)', borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <Group gap={12} wrap="nowrap">
+                          <Avatar size={32} radius="xl" style={{ background: s.avatarColor, color: '#fff', fontSize: 11, fontWeight: 700 }}>
+                            {s.avatarInitials}
+                          </Avatar>
+                          <Box style={{ flex: 1 }}>
+                            <Text size="sm" fw={700}>{s.name}</Text>
+                            <Text size="xs" c="dimmed">{s.email}</Text>
+                          </Box>
+                          <Button size="compact-xs" variant="filled" onClick={() => assign(s.id)} disabled={loading}>Assign</Button>
+                        </Group>
+                      </Paper>
+                    ))}
+                    {suggestions.length === 0 && !fetchingSuggestions && !search && (
+                      <Box py={20} style={{ textAlign: 'center' }}>
+                        <Text size="xs" c="dimmed">Search for more certified staff members.</Text>
+                      </Box>
+                    )}
+                  </Stack>
+                </Stack>
+              ) : isFull ? (
+                <Box py={40} ta="center">
+                  <ThemeIcon size={40} radius="xl" color="green" variant="light" mb={12}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{width: 20, height: 20}}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  </ThemeIcon>
+                  <Text size="sm" fw={700}>Shift Fully Staffed</Text>
+                  <Text size="xs" c="dimmed">All {shift.headcount} positions have been filled.</Text>
+                </Box>
+              ) : (
+                <Box py={40} ta="center">
+                  <Text size="sm" c="red" fw={700}>Shift is Locked</Text>
+                  <Text size="xs" c="dimmed">The edit cutoff has passed. No further assignments can be made.</Text>
+                </Box>
+              )}
+            </Paper>
+          </Grid.Col>
+        </Grid>
+
+        {/* Audit Trail Timeline */}
+        {auditLogs.length > 0 && (
+          <Paper p="xl" radius="lg" withBorder style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <Title order={3} size={18} fw={800} mb={24}>Activity History</Title>
+            <Timeline active={auditLogs.length} bulletSize={12} lineWidth={2}>
+              {auditLogs.map((log) => (
+                <Timeline.Item 
+                  key={log.id} 
+                  title={
+                    <Group gap={8}>
+                      <Text size="sm" fw={800}>{performerMap[log.actorId] ?? log.actorId}</Text>
+                      <Text size="xs" c="dimmed" tt="lowercase">{(log.action || '').replace('_', ' ')}</Text>
+                    </Group>
+                  }
+                >
+                  <Box mt={4}>
+                    {(log.after as any)?.staffId && (
+                      <Text size="xs" c="indigo" fw={700}>
+                        Target: {performerMap[(log.after as any)?.staffId] ?? (log.after as any)?.staffId}
+                      </Text>
+                    )}
+                    {(log.after as any)?.overrideReason && (
+                      <Badge size="xs" color="orange" variant="light" mt={4}>
+                        Override: {(log.after as any).overrideReason}
+                      </Badge>
+                    )}
+                    <Text size="xs" c="dimmed" mt={4}>
+                      {new Date(log.createdAt).toLocaleString()}
+                    </Text>
+                  </Box>
+                </Timeline.Item>
               ))}
-              {suggestions.length === 0 && !fetchingSuggestions && (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No matching staff available</p>
-              )}
-            </div>
-            {msg && <p style={{ color: '#ef4444', fontSize: 13, marginTop: 8 }}>{msg}</p>}
-          </div>
+            </Timeline>
+          </Paper>
         )}
-      </div>
-
-      {/* Audit Log */}
-      {auditLogs.length > 0 && (
-        <div className="card" style={{ marginTop: 24 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>Audit Trail</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {auditLogs.map((log, i) => (
-              <div key={log.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: i < auditLogs.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-brand-500)', marginTop: 6, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{performerMap[log.performedBy] ?? log.performedBy}</span>
-                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{log.action}</span>
-                    {(log.metadata as any)?.staffId && (
-                      <span style={{ fontSize: 12, color: 'var(--color-brand-400)' }}>
-                        → {performerMap[(log.metadata as any).staffId] ?? (log.metadata as any).staffId}
-                      </span>
-                    )}
-                    {(log.metadata as any)?.overrideReason && (
-                      <span style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 6px', borderRadius: 4 }}>
-                        Override: {(log.metadata as any).overrideReason}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {new Date(log.performedAt).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      </Stack>
+      {msg && (
+        <Alert color="red" radius="md" mt="xl" title="Error">
+          {msg}
+        </Alert>
       )}
-    </div>
+    </Box>
   )
 }

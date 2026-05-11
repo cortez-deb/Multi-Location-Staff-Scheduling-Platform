@@ -180,13 +180,13 @@ export interface AppNotification {
 // ─────────────────────────────────────────────────────────────
 export interface AuditLog {
   id: string
-  entityType: 'shift' | 'swap' | 'user' | 'availability'
+  entityType: 'shift' | 'Shift' | 'swap' | 'user' | 'availability' | 'location' | 'skill'
   entityId: string
   action: string
   before: unknown
   after: unknown
-  performedBy: string // user ID
-  performedAt: string // ISO timestamp
+  actorId: string // user ID
+  createdAt: string // ISO timestamp
   locationId?: LocationId
   metadata?: Record<string, unknown>
 }

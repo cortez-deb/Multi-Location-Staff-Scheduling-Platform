@@ -17,7 +17,7 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   const allStaff = db.users.filter(u => u.role === 'staff' || u.role === 'manager').map(u => {
     const { passwordHash: _, ...s } = u; return s
   })
-  const auditLogs = await getEntityAuditLogs('shift', id)
+  const auditLogs = await getEntityAuditLogs('Shift', id)
   const performerMap = Object.fromEntries(db.users.map(u => [u.id, u.name]))
 
   return (

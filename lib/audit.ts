@@ -1,7 +1,7 @@
 import type { AuditLog, LocationId } from './types'
 import { fetchApi } from './api'
 
-export async function writeAuditLog(params: Omit<AuditLog, 'id' | 'performedAt'>) {
+export async function writeAuditLog(params: Omit<AuditLog, 'id' | 'createdAt'>) {
   // Now handled by the backend
   return null;
 }

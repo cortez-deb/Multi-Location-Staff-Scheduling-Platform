@@ -256,8 +256,8 @@ export async function createAssignment(req, res, next) {
         status: 'assigned'
       });
 
-      const auditData = overrideReason ? { overrideReason } : null;
-      await logAudit(req.user.userId, 'ShiftAssignment', assignment.id, 'ASSIGNMENT_CREATED', null, { ...assignment.toJSON(), ...auditData });
+      const auditData = overrideReason ? { overrideReason, staffId: userId } : { staffId: userId };
+      await logAudit(req.user.userId, 'Shift', shiftId, 'ASSIGNMENT_CREATED', null, { ...assignment.toJSON(), ...auditData });
 
       const shift = await Shift.findByPk(shiftId);
       const io = getIO();
@@ -289,7 +289,7 @@ export async function deleteAssignment(req, res, next) {
 
     const before = assignment.toJSON();
     await assignment.destroy();
-    await logAudit(req.user.userId, 'ShiftAssignment', assignment.id, 'ASSIGNMENT_DELETED', before, null);
+    await logAudit(req.user.userId, 'Shift', shiftId, 'ASSIGNMENT_DELETED', before, { staffId: userId });
 
     res.status(204).end();
   } catch (err) {
@@ -330,7 +330,7 @@ export async function getEligibleStaff(req, res, next) {
     for (const user of users) {
       const result = await checkConstraints(user.id, shiftId);
       
-      const hasNonOverridableHardBlocks = result.violations.some(v => v.code !== 'DAILY_HOURS_BLOCK' && v.code !== 'CONSECUTIVE_DAY_BLOCK');
+      const hasNonOverridableHardBlocks = result.violations.some(v => v.code !== 'DAILY_HOURS_BLOCK' && v.code !== 'CONSECUTIVE_DAY_BLOCK' && v.code !== 'UNAVAILABLE');
       
       if (!hasNonOverridableHardBlocks) {
         eligible.push({ 
