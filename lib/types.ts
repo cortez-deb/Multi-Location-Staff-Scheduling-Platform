@@ -41,6 +41,14 @@ export type NotificationType =
   | 'overtime_warning'
   | 'availability_changed'
   | 'override_required'
+  | 'LEAVE_REQUESTED'
+  | 'LEAVE_APPROVED'
+  | 'LEAVE_REJECTED'
+  | 'LEAVE_SHIFT_UNASSIGNED'
+  | 'LEAVE_CANCELLED'
+  | 'MANAGER_ASSIGNED'
+  | 'SKILL_ADDED'
+  | 'LOCATION_CERTIFIED'
 
 // ─────────────────────────────────────────────────────────────
 // Location
@@ -74,6 +82,8 @@ export interface User {
   phone?: string
   hireDate: string
   isActive: boolean
+  reportsToId?: string
+  manager?: { id: string, name: string }
   notificationPrefs: {
     inApp: boolean
     emailSimulation: boolean
@@ -162,6 +172,7 @@ export interface AppNotification {
   relatedShiftId?: string
   relatedSwapId?: string
   relatedUserId?: string
+  metadata?: Record<string, any>
 }
 
 // ─────────────────────────────────────────────────────────────

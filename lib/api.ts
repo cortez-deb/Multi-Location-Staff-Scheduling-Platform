@@ -22,6 +22,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   }
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://coastaleats-bc.onrender.com';
+  const normalizedUrl = backendUrl.replace(/\/$/, '');
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
   const headers = new Headers(options.headers);
   if (token) {
@@ -31,7 +33,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const res = await fetch(`${backendUrl}${endpoint}`, {
+  const res = await fetch(`${normalizedUrl}${normalizedEndpoint}`, {
     ...options,
     headers,
     cache: 'no-store',

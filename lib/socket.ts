@@ -29,6 +29,14 @@ export type SocketEvent =
   | 'availability_changed'
   | 'conflict_detected'
   | 'shift_updated'     // generic UI refresh hint
+  | 'LEAVE_REQUESTED'
+  | 'LEAVE_APPROVED'
+  | 'LEAVE_REJECTED'
+  | 'LEAVE_CANCELLED'
+  | 'LEAVE_SHIFT_UNASSIGNED'
+  | 'MANAGER_ASSIGNED'
+  | 'SKILL_ADDED'
+  | 'LOCATION_CERTIFIED'
   | 'heartbeat'
 
 export interface SocketPayload {
