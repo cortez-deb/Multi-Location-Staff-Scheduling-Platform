@@ -221,7 +221,7 @@ function StatCard({ icon, label, value, color, alert }: { icon: React.ReactNode;
       }}
     >
       <Text size="xl" c={color} style={{ display: 'flex', alignItems: 'center' }}>{icon}</Text>
-      <Text size={{ base: '1.5rem', sm: '2rem' }} fw={800} c={color} lh={1}>{value}</Text>
+      <Text fz={{ base: '1.5rem', sm: '2rem' }} fw={800} c={color} lh={1}>{value}</Text>
       <Text size="xs" c="dimmed" fw={500}>{label}</Text>
     </Paper>
   )

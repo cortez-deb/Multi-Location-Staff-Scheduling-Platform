@@ -86,10 +86,13 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
   }
 
   const handleSave = async () => {
-    if (!formData.name || !formData.email || formData.certifiedLocations.length === 0) {
+    const isStaffOrManager = formData.role === 'staff' || formData.role === 'manager';
+    if (!formData.name || !formData.email || (isStaffOrManager && formData.certifiedLocations.length === 0)) {
       notifications.show({
         title: 'Missing Required Fields',
-        message: 'Please provide a name, email, and at least one certified location.',
+        message: isStaffOrManager 
+          ? 'Please provide a name, email, and at least one certified location.' 
+          : 'Please provide a name and email.',
         color: 'red',
         radius: 'md',
       })
@@ -413,21 +416,29 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
               onChange={(val) => setFormData({ ...formData, role: (val || 'staff') as any })}
               required
             />
-            <MultiSelect
-              label="Certified Locations"
-              data={locOptions}
-              value={formData.certifiedLocations}
-              onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
-              required
-              searchable
-            />
-            <MultiSelect
-              label="Skills"
-              data={skillOptions}
-              value={formData.skills}
-              onChange={(val) => setFormData({ ...formData, skills: val })}
-              searchable
-            />
+            {formData.role !== 'admin' ? (
+              <>
+                <MultiSelect
+                  label="Certified Locations"
+                  data={locOptions}
+                  value={formData.certifiedLocations}
+                  onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
+                  required
+                  searchable
+                />
+                <MultiSelect
+                  label="Skills"
+                  data={skillOptions}
+                  value={formData.skills}
+                  onChange={(val) => setFormData({ ...formData, skills: val })}
+                  searchable
+                />
+              </>
+            ) : (
+              <Box p="md" style={{ textAlign: 'center', border: '1px dashed var(--border-light)', borderRadius: 8 }}>
+                <Text size="sm" c="dimmed">Administrators have global access and do not require specific location or skill assignments.</Text>
+              </Box>
+            )}
             <Switch
               label="Active Employee"
               checked={formData.isActive}
@@ -473,21 +484,29 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
                     onChange={(val) => setFormData({ ...formData, role: (val || 'staff') as any })}
                     required
                   />
-                  <MultiSelect
-                    label="Certified Locations"
-                    data={locOptions}
-                    value={formData.certifiedLocations}
-                    onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
-                    required
-                    searchable
-                  />
-                  <MultiSelect
-                    label="Skills"
-                    data={skillOptions}
-                    value={formData.skills}
-                    onChange={(val) => setFormData({ ...formData, skills: val })}
-                    searchable
-                  />
+                  {formData.role !== 'admin' ? (
+                    <>
+                      <MultiSelect
+                        label="Certified Locations"
+                        data={locOptions}
+                        value={formData.certifiedLocations}
+                        onChange={(val) => setFormData({ ...formData, certifiedLocations: val })}
+                        required
+                        searchable
+                      />
+                      <MultiSelect
+                        label="Skills"
+                        data={skillOptions}
+                        value={formData.skills}
+                        onChange={(val) => setFormData({ ...formData, skills: val })}
+                        searchable
+                      />
+                    </>
+                  ) : (
+                    <Box p="xl" style={{ textAlign: 'center', border: '1px dashed var(--border-light)', borderRadius: 8 }}>
+                      <Text size="sm" c="dimmed">Administrators have global access and do not require specific location or skill assignments.</Text>
+                    </Box>
+                  )}
                 </Stack>
               </Stepper.Step>
               <Stepper.Step label="Security" description="Password setup">
@@ -518,7 +537,7 @@ export function StaffClient({ session, users, locations, weeklyHours, apiLocatio
               {activeStep < 2 ? (
                 <Button onClick={nextStep} disabled={
                   (activeStep === 0 && (!formData.name || !formData.email)) ||
-                  (activeStep === 1 && (formData.certifiedLocations.length === 0))
+                  (activeStep === 1 && formData.role !== 'admin' && formData.certifiedLocations.length === 0)
                 }>Next step</Button>
               ) : (
                 <Button onClick={handleSave} loading={isSaving} disabled={!isPasswordValid}>Save User</Button>
