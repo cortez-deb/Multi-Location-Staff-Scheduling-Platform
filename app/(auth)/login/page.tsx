@@ -104,7 +104,7 @@ export default function LoginPage() {
           <Stack gap={6}>
             {[
               { role: 'Admin', email: 'admin@coastaleats.com', pass: 'password123', color: '#f59e0b' },
-              { role: 'Downtown Manager', email: 'manager1@coastaleats.com', pass: 'password123', color: '#6366f1' },
+              { role: 'Downtown Manager', email: 'manager@coastaleats.com', pass: 'password123', color: '#6366f1' },
               { role: 'Staff', email: 'john@coastaleats.com', pass: 'password123', color: '#ec4899' },
             ].map(c => (
               <Box key={c.email} p="sm" style={{ background: 'var(--bg-card)', borderRadius: 8 }}>
